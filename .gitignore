@@ -1,0 +1,5 @@
+/gatsby-node.js
+/nodes
+.idea
+*.iml
+node_modules
