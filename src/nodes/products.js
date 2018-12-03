@@ -13,7 +13,7 @@ const createProductNodes = (
     }
 ) => {
     if (!mediaCatalogUrl) {
-        throw new Error(
+        reporter.panic(
             'You need to pass catalogUrl option to Magento2 source plugin. Example: https://yourstore.com/media/catalog'
         );
     }
@@ -54,7 +54,7 @@ const createProductNodes = (
                     },
                 });
             } catch (e) {
-                console.error(e);
+                reject(e);
             }
         }
 
