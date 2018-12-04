@@ -5,17 +5,14 @@ import crypto from 'crypto';
 
 const createProductNodes = (
     { createNode, createPage, createNodeId, store, cache, reporter, auth },
-    {
-        // base url + /graphql
-        graphqlEndpoint,
-        // base url + '/media/catalog'
-        mediaCatalogUrl = null,
-    }
+    { graphqlEndpoint, storeConfig }
 ) => {
-    if (!mediaCatalogUrl) {
-        reporter.panic(
-            'You need to pass catalogUrl option to Magento2 source plugin. Example: https://yourstore.com/media/catalog'
-        );
+    if (!storeConfig) {
+        reporter.panic(`got empty storeConfig`);
+    }
+
+    if (!storeConfig.secure_base_media_url) {
+        reporter.panic(`got empty storeConfig.secure_base_media_url`);
     }
 
     return new Promise(async (resolve, reject) => {
@@ -25,7 +22,20 @@ const createProductNodes = (
         for (let i = 0; i < res.products.items.length; i++) {
             try {
                 const item = res.products.items[i];
-                const image = mediaCatalogUrl + '/product' + item.image;
+                if (!item) {
+                    reporter.panic(
+                        `Got invalid result from GraphQL endpoint: ${JSON.stringify(
+                            item,
+                            0,
+                            2
+                        )}`
+                    );
+                }
+
+                const image =
+                    storeConfig.secure_base_media_url +
+                    'catalog/product' +
+                    item.image;
 
                 const fileNode = await createRemoteFileNode({
                     url: image,
@@ -36,23 +46,27 @@ const createProductNodes = (
                     auth,
                 });
 
-                item.image___NODE = fileNode.id;
+                if (fileNode) {
+                    item.image___NODE = fileNode.id;
 
-                createNode({
-                    ...item,
-                    id: createNodeId(`${item.id}`),
-                    magento_id: item.id,
-                    parent: `__PRODUCTS__`,
-                    children: [],
-                    internal: {
-                        type: 'MagentoProduct',
-                        content: JSON.stringify(item),
-                        contentDigest: crypto
-                            .createHash(`md5`)
-                            .update(JSON.stringify(item))
-                            .digest(`hex`),
-                    },
-                });
+                    createNode({
+                        ...item,
+                        id: createNodeId(`${item.id}`),
+                        magento_id: item.id,
+                        parent: `__PRODUCTS__`,
+                        children: [],
+                        internal: {
+                            type: 'MagentoProduct',
+                            content: JSON.stringify(item),
+                            contentDigest: crypto
+                                .createHash(`md5`)
+                                .update(JSON.stringify(item))
+                                .digest(`hex`),
+                        },
+                    });
+                } else {
+                    console.error('failed to download image:', image);
+                }
             } catch (e) {
                 reject(e);
             }

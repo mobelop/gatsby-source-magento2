@@ -27,7 +27,7 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "gatsby": ">2.0.0"
+    "gatsby": ">2.0.60"
   },
   "repository": "https://github.com/mobelop/gatsby-source-magento2",
   "scripts": {

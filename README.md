@@ -20,8 +20,7 @@ plugins: [
     {
         resolve: "gatsby-source-magento2",
         options: {
-            graphqlEndpoint: "https://yourstore.url/graphql",
-            mediaCatalogUrl: "https://yourstore.url/media/catalog",
+            graphqlEndpoint: "https://yourstore.url/graphql"
         }
     }
 ]
