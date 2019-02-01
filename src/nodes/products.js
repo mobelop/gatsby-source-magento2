@@ -5,7 +5,7 @@ import crypto from 'crypto';
 
 const createProductNodes = (
     { createNode, createPage, createNodeId, store, cache, reporter, auth },
-    { graphqlEndpoint, storeConfig }
+    { graphqlEndpoint, storeConfig, queries }
 ) => {
     if (!storeConfig) {
         reporter.panic(`got empty storeConfig`);
@@ -17,7 +17,14 @@ const createProductNodes = (
 
     return new Promise(async (resolve, reject) => {
         const client = new GraphQLClient(graphqlEndpoint, {});
-        const res = await client.request(allProductsQuery);
+
+        // use custom query for querying products
+        const query =
+            queries && queries.allProductsQuery
+                ? queries.allProductsQuery
+                : allProductsQuery;
+
+        const res = await client.request(query);
 
         for (let i = 0; i < res.products.items.length; i++) {
             try {

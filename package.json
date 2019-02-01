@@ -1,7 +1,7 @@
 {
   "name": "gatsby-source-magento2",
   "description": "Gatsby plugin which fetches store data from Magento2",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": "Stanislav Smovdorenko <stan.sm@mobelop.com>",
   "bugs": {
     "url": "https://github.com/mobelop/gatsby-source-magento2/issues"

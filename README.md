@@ -1,9 +1,10 @@
 # gatsby-source-magento2
+
 Source plugin for pulling data into [Gatsby][gatsby] from [Magento 2.3][magento]
 
 ## Features
 
-- Provides public data available via Magento 2.3 GraphQL endpoint
+- Provides public data available via standard Magento 2.3 GraphQL endpoint
 - Supports `gatsby-transformer-sharp` and `gatsby-image` for images
 
 ## Install
@@ -20,7 +21,13 @@ plugins: [
     {
         resolve: "gatsby-source-magento2",
         options: {
-            graphqlEndpoint: "https://yourstore.url/graphql"
+            graphqlEndpoint: "https://yourstore.url/graphql",
+            
+            // this is optional
+            queries: {
+                // see example query in src/nodes/queries/products.js
+                allProductsQuery: `... custom GraphQL query for fetching all the products you need to publish on Gatsby website ...`
+            }
         }
     }
 ]
