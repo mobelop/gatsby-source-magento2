@@ -26,14 +26,17 @@ plugins: [
             // this is optional
             queries: {
                 // see example query in src/nodes/queries/products.js
-                allProductsQuery: `... custom GraphQL query for fetching all the products you need to publish on Gatsby website ...`
+                allProductsQuery: `... custom GraphQL query for fetching all the products you need to publish on Gatsby website ...`,
+                // see example query in src/nodes/queries/categories.js
+                categoryQuery: `... custom GraphQL query for fetching all the categories & product ids ...`
             }
         }
     }
 ]
 ```
 
-Then you can use queries `magentoProduct` and `allMagentoProduct` to query the product catalog.
+Then you can use queries `magentoProduct` and `allMagentoProduct` to query the product catalog. For querying categories - use 
+`magentoCategory` and `allMagentoCategory` queries.
 
 ## Creating product page nodes
 
@@ -56,6 +59,16 @@ exports.createPages = ({ graphql, actions }) => {
                                 }
                             }
                         }
+                        
+                        allMagentoCategory {
+                            edges {
+                                node {
+                                    magento_id
+                                    url_key
+                                    url_path
+                                }
+                            }
+                        }
                     }
                 `
             ).then(result => {
@@ -67,13 +80,32 @@ exports.createPages = ({ graphql, actions }) => {
                 result.data.allMagentoProduct.edges.forEach(({node}) => {
                     createPage({
                         path: `/${node.url_key}/`,
-                        component: path.resolve(`./src/pages/product.js`),
+                        component: path.resolve(`./src/pages/product.jsx`),
                         context: {
                             url_key: node.url_key,
                         },
                     });
                 });
+                
+                result.data.allMagentoCategory.edges.forEach(({ node }) => {
+                    createPage({
+                        path: `/${node.url_path}/`,
+                        component: path.resolve(`./src/pages/category.jsx`),
+                        context: {
+                            category_id: node.magento_id,
+                            url_key: node.url_key,
+                        },
+                    });
 
+                    // id is gatsby.js node id. we need to put magento_id there instead
+                    const dstCategory = {
+                        ...node,
+                        id: node.magento_id,
+                    };
+
+                    delete dstCategory.magento_id;
+                });
+                
             })
         );
     });
@@ -83,10 +115,8 @@ exports.createPages = ({ graphql, actions }) => {
 ## Future work
 
 Add other node sources:
-- category 
 - cmsPage
 - cmsBlocks
-- storeConfig
 
 [gatsby]: https://www.gatsbyjs.org/
 [magento]: https://magento.com/

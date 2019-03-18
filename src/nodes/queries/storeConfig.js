@@ -18,6 +18,6 @@ const storeConfig = `
     secure_base_media_url
   }
 }
-`
+`;
 
 export default storeConfig;

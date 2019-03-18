@@ -2,10 +2,12 @@ import { GraphQLClient } from 'graphql-request';
 import { createRemoteFileNode } from 'gatsby-source-filesystem';
 import allProductsQuery from './queries/products';
 import crypto from 'crypto';
+import fs from 'fs';
 
 const createProductNodes = (
     { createNode, createPage, createNodeId, store, cache, reporter, auth },
-    { graphqlEndpoint, storeConfig, queries }
+    { graphqlEndpoint, storeConfig, queries },
+    productMap
 ) => {
     if (!storeConfig) {
         reporter.panic(`got empty storeConfig`);
@@ -13,6 +15,10 @@ const createProductNodes = (
 
     if (!storeConfig.secure_base_media_url) {
         reporter.panic(`got empty storeConfig.secure_base_media_url`);
+    }
+
+    if (!fs.existsSync('.skip')) {
+        fs.mkdirSync('.skip');
     }
 
     return new Promise(async (resolve, reject) => {
@@ -29,6 +35,11 @@ const createProductNodes = (
         for (let i = 0; i < res.products.items.length; i++) {
             try {
                 const item = res.products.items[i];
+
+                if (fs.existsSync(`.skip/${item.id}`)) {
+                    continue;
+                }
+
                 if (!item) {
                     reporter.panic(
                         `Got invalid result from GraphQL endpoint: ${JSON.stringify(
@@ -56,9 +67,9 @@ const createProductNodes = (
                 if (fileNode) {
                     item.image___NODE = fileNode.id;
 
-                    createNode({
+                    const nodeData = {
                         ...item,
-                        id: createNodeId(`${item.id}`),
+                        id: createNodeId(`product-${item.id}`),
                         magento_id: item.id,
                         parent: `__PRODUCTS__`,
                         children: [],
@@ -70,8 +81,13 @@ const createProductNodes = (
                                 .update(JSON.stringify(item))
                                 .digest(`hex`),
                         },
-                    });
+                    };
+
+                    createNode(nodeData);
+
+                    productMap[item.id] = nodeData.id;
                 } else {
+                    fs.writeFileSync(`.skip/${item.id}`);
                     console.error('failed to download image:', image);
                 }
             } catch (e) {

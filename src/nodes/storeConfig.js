@@ -29,11 +29,9 @@ const createStoreNode = (
             });
 
             resolve(config);
-        } catch(e) {
-            reporter.panic(`Failed to fetch Magento store config: ${e}`)
+        } catch (e) {
+            reporter.panic(`Failed to fetch Magento store config: ${e}`);
         }
-
-
     });
 };
 
