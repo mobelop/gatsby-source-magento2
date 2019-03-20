@@ -65,6 +65,8 @@ const createProductNodes = (
                 });
 
                 if (fileNode) {
+                    delete item.image;
+
                     item.image___NODE = fileNode.id;
 
                     const nodeData = {

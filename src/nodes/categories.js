@@ -95,6 +95,7 @@ async function fetchCategories(context, rootId, productMap) {
             itemCopy.children = children;
 
             delete itemCopy.products;
+            delete itemCopy.image;
 
             const nodeData = {
                 ...itemCopy,
