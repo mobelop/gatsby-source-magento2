@@ -23,9 +23,15 @@ query {
       small_image
       
       url_key
+
+      new      
+      performance_fabric
+      eco_collection
       
       ... on ConfigurableProduct {
         configurable_options {
+          attribute_id          
+          attribute_code          
           label
           values {
             label

@@ -7,7 +7,8 @@ import fs from 'fs';
 const createProductNodes = (
     { createNode, createPage, createNodeId, store, cache, reporter, auth },
     { graphqlEndpoint, storeConfig, queries },
-    productMap
+    productMap,
+    indexMap
 ) => {
     if (!storeConfig) {
         reporter.panic(`got empty storeConfig`);
@@ -88,6 +89,21 @@ const createProductNodes = (
                     createNode(nodeData);
 
                     productMap[item.id] = nodeData.id;
+
+                    indexMap['product'][item.id] = nodeData.id;
+                    indexMap['product']['sku_' + item.sku] = nodeData.id;
+
+                    const aggregate = ['new', 'eco_collection']
+
+                    for(const aggr of aggregate) {
+                        const key = aggr + '_' + item[aggr]
+                        if(!indexMap['product'][key]) {
+                            indexMap['product'][key] = []
+                        }
+
+                        indexMap['product'][key].push(nodeData.id);
+                    }
+
                 } else {
                     fs.writeFileSync(`.skip/${item.id}`);
                     console.error('failed to download image:', image);
