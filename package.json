@@ -1,7 +1,7 @@
 {
   "name": "gatsby-source-magento2",
   "description": "GatsbyJS plugin which fetches storefront data from the Magento2 GraphQL endpoint",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "author": "Stanislav Smovdorenko <stan.sm@mobelop.com>",
   "bugs": {
     "url": "https://github.com/mobelop/gatsby-source-magento2/issues"
