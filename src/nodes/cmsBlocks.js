@@ -20,7 +20,7 @@ const createCmsBlockNodes = (
         queries && queries.cmsBlockQuery
             ? queries.cmsBlockQuery
             : cmsBlockQuery;
-    
+
     const activity = reporter.activityTimer(`load Magento cmsBlocks`);
 
     activity.start();
@@ -28,28 +28,33 @@ const createCmsBlockNodes = (
     return new Promise(async (resolve, reject) => {
         const client = new GraphQLClient(graphqlEndpoint, {});
 
-        await fetchCMSBlocks(
-            {
-                client,
-                query,
-                reject: () => {
-                    activity.end();
-                    reject();
+        try {
+            await fetchCMSBlocks(
+                {
+                    client,
+                    query,
+                    reject: () => {
+                        activity.end();
+                        reject();
+                    },
+                    createNode,
+                    createNodeId,
+                    storeConfig,
+                    auth,
+                    store,
+                    cache,
+                    reporter,
                 },
-                createNode,
-                createNodeId,
-                storeConfig,
-                auth,
-                store,
-                cache,
-                reporter,
-            },
-            indexMap
-        );
+                indexMap
+            );
 
-        activity.end();
+            activity.end();
 
-        resolve();
+            resolve();
+        } catch (e) {
+            console.error('Error while creating cmsBlock nodes:', e);
+            reject(e);
+        }
     });
 };
 
@@ -93,13 +98,20 @@ async function fetchCMSBlocks(context, indexMap) {
                 ...item,
             };
 
-            itemCopy.nodes = parseChildNodes(nodes, indexMap);
+            // itemCopy.nodes___NODE = parseChildNodes(
+            const children = parseChildNodes(
+                item.identifier,
+                createNode,
+                createNodeId,
+                nodes,
+                indexMap
+            );
 
             const nodeData = {
                 ...itemCopy,
                 id: createNodeId(`magento-cms-block-${item.identifier}`),
                 magento_id: item.identifier,
-                children: [],
+                children,
                 internal: {
                     type: 'MagentoCmsBlock',
                     content: JSON.stringify(itemCopy),
@@ -113,62 +125,102 @@ async function fetchCMSBlocks(context, indexMap) {
             createNode(nodeData);
         }
     } catch (e) {
-        console.error(e);
-        reporter.panic(`error executing GraphQL query ${e}`);
+        console.error('error executing GraphQL query:', e);
         reject(e);
     }
 }
 
-function parseChildNodes(nodes, indexMap) {
-    return nodes.map(block => {
+function parseChildNodes(magentoId, createNode, createNodeId, nodes, indexMap) {
+    return nodes.map((block, idx) => {
         switch (block.type) {
             case 'text':
-                return {
-                    type: 'text',
+                const node = {
+                    id: createNodeId(`cms-node-${magentoId}-${idx}`),
+                    blockType: 'text',
                     value: block.value,
-                    items___NODES: [],
+                    // items___NODES: [],
+                    internal: {
+                        type: 'CmsTextBlockNode',
+                        contentDigest: crypto
+                            .createHash(`md5`)
+                            .update(block.value)
+                            .digest(`hex`),
+                    },
                 }
+
+                createNode(node);
+
+                return node.id;
 
             case 'Magento\\CatalogWidget\\Block\\Product\\ProductsList':
                 // WIP !!!
-                const conditions = JSON.parse(block.conditions_encoded.replace(/\^\[/g, '{').replace(/`/g, '"').replace(/\^\]/g, "}"))
-                let items___NODES = []
+                const conditions = JSON.parse(
+                    block.conditions_encoded
+                        .replace(/\^\[/g, '{')
+                        .replace(/`/g, '"')
+                        .replace(/\^\]/g, '}')
+                );
 
-                const query = conditions["1--1"]
+                let products___NODES = [];
+
+                const query = conditions['1--1'];
 
                 const products = indexMap.product;
 
-                if(query.attribute) {
-                    switch(query.operator) {
+                if (query.attribute) {
+                    switch (query.operator) {
                         case '==':
-                            const entry = products[query.attribute + '_' + query.value]
-                            if(entry) {
-                                items___NODES.push(...entry)
+                            const parts = query.value
+                                .replace(/\|\//g, '/')
+                                .split(', ');
+                            if (Array.isArray(parts)) {
+                                for (const value of parts) {
+                                    const entry =
+                                        products[query.attribute + '_' + value];
+                                    if (entry) {
+                                        products___NODES.push(entry);
+                                    }
+                                }
                             }
-                
                             break;
 
                         case '()':
-                            const values = query.value.split(', ')
-                            for(const value of values) {
-                                const entry = products[query.attribute + '_' + value]
-                                if(entry) {
-                                    items___NODES.push(entry);
+                            const values = query.value.split(', ');
+                            for (const value of values) {
+                                const entry =
+                                    products[query.attribute + '_' + value];
+                                if (entry) {
+                                    products___NODES.push(entry);
                                 } else {
-                                    console.info(`couldn't find product by: ${query.attribute} = ${value}`)
+                                    console.info(
+                                        `couldn't find product by: ${
+                                            query.attribute
+                                        } = ${value}`
+                                    );
                                 }
                             }
-                            break
+                            break;
                     }
                 }
 
-                return {
-                    type: 'products',
+                const result = {
+                    id: createNodeId(`cms-node-${magentoId}-${idx}`),
+                    blockType: 'products',
                     value: null,
-                    items___NODES,
-                    // items: []
+                    count: products___NODES.length,
+                    children: products___NODES,
+                    internal: {
+                        type: 'CmsProductListNode',
+                        contentDigest: crypto
+                            .createHash(`md5`)
+                            .update(block.conditions_encoded)
+                            .digest(`hex`),
+                    },
                 }
+                
+                createNode(result);
 
+                return result.id;
         }
-    })
+    });
 }

@@ -65,8 +65,8 @@ export default function cmsContentParser(content, {media_url = '/'} = {}) {
 
     }
 
-    if (lastIdx < content.length && resultNodes && resultNodes.length) {
-        if(resultNodes[resultNodes.length - 1].type === 'text') {
+    if (lastIdx < content.length) {
+        if(resultNodes && resultNodes.length && resultNodes[resultNodes.length - 1].type === 'text') {
             resultNodes[resultNodes.length - 1].value += content.substr(lastIdx);
         } else {
             resultNodes.push({

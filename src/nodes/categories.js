@@ -2,6 +2,16 @@ import { GraphQLClient } from 'graphql-request';
 import categoryQuery from './queries/categories';
 import createImageNode from './images';
 import crypto from 'crypto';
+import ProgressBar from "progress";
+
+const bar = new ProgressBar(
+    `Processing Magento Root Categories [:bar] :current/:total :elapsed secs :percent`,
+    {
+        total: 0,
+        width: 30,
+    }
+);
+
 
 const createCategoryNodes = (
     { createNode, createPage, createNodeId, store, cache, reporter, auth },
@@ -74,7 +84,11 @@ async function fetchCategories(context, rootId, productMap) {
                 id: rootId,
             });
 
-            cache.set(categoryCacheKey, res);
+            await cache.set(categoryCacheKey, res);
+        }
+
+        if(rootId === 2) {
+            bar.total = res.category.children.length
         }
 
         for (const item of res.category.children) {
@@ -88,9 +102,20 @@ async function fetchCategories(context, rootId, productMap) {
                 ...item,
             };
 
-            itemCopy.products___NODE = item.products.items.map(
-                item => productMap[item.id]
-            );
+            if (item.display_mode === 'PAGE') {
+                itemCopy.products___NODE = [];
+            } else {
+                let productItems = item.products.items;
+
+                // limit to 200 products / category
+                if (item.products.items.length > 200) {
+                    productItems = productItems.slice(200);
+                }
+
+                itemCopy.products___NODE = productItems.map(
+                    item => productMap[item.id]
+                );
+            }
 
             itemCopy.children = children;
 
@@ -121,10 +146,15 @@ async function fetchCategories(context, rootId, productMap) {
 
             createNode(nodeData);
 
+            if(rootId === 2) {
+                bar.tick();
+            }
+
             ids.push(nodeData.id);
         }
     } catch (e) {
-        reject(e);
+        // console.error('Error while creating category nodes:', e);
+        // reject(e);
     }
 
     return ids;

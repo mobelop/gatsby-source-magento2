@@ -5,6 +5,9 @@ query fetchCategory($id: Int!){
             id
             name
             description
+            
+            created_at
+            updated_at
     
             url_key
             url_path

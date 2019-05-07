@@ -19,8 +19,14 @@ async function createImageNode(context, baseURL, imageName, nodeData) {
         return;
     }
 
+    // gif & bmp images should be converted to jpg
+    imageName = imageName.replace('.gif', '.jpg').replace('.bmp', '.jpg');
+
     const image =
-        context.storeConfig.secure_base_media_url + baseURL + '/' + imageName;
+        context.storeConfig.secure_base_media_url +
+        baseURL +
+        '/' +
+        encodeURIComponent(imageName);
 
     try {
         const fileNode = await createRemoteFileNode({

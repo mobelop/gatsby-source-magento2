@@ -12,22 +12,33 @@ query {
       id
       sku
       name
+      type_id
+
+      description {
+        html
+      }
       
-      description
-      short_description
+      short_description {
+        html
+      }
+      
       meta_title
       meta_keyword
       meta_description
-
-      image      
-      small_image
       
+      image {
+        label
+        url
+      }
+
       url_key
-
-      new      
-      performance_fabric
-      eco_collection
       
+      new_to_date
+      new_from_date
+      special_price
+      
+      updated_at
+
       ... on ConfigurableProduct {
         configurable_options {
           attribute_id          
@@ -39,13 +50,13 @@ query {
           }
         }
       }
-
+      
       categories {
         id
         name
         url_path
       }
-      
+
       price {
         regularPrice {
           amount {
