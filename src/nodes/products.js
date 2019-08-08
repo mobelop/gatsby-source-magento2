@@ -37,6 +37,8 @@ const createProductNodes = (
 
     const activity = reporter.activityTimer(`load Magento products`);
 
+    activity.start();
+
     return new Promise(async (resolve, reject) => {
         const client = new GraphQLClient(graphqlEndpoint, {});
 
