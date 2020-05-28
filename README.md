@@ -2,6 +2,8 @@
 
 Source plugin for pulling data into [Gatsby][gatsby] from [Magento 2.3][magento]
 
+Supports: **Magento 2.3.5** Community Edition
+
 ## Features
 
 - Provides public data available via standard Magento 2.3 GraphQL endpoint
