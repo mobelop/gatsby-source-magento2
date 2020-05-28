@@ -51,10 +51,7 @@ const createProductNodes = (
                     );
                 }
 
-                const image =
-                    storeConfig.secure_base_media_url +
-                    'catalog/product' +
-                    item.image;
+                const image = item.image.url;
 
                 const fileNode = await createRemoteFileNode({
                     url: image,
