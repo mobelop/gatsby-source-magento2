@@ -15,5 +15,5 @@ export default async function createMagentoNodes(params, options) {
 
     await createProductNodes(params, { ...options, ...config }, productMap, indexMap);
     await createCategoryNodes(params, { ...options, ...config }, productMap, indexMap);
-    await createCmsBlockNodes(params, { ...options, ...config }, indexMap);
+    // await createCmsBlockNodes(params, { ...options, ...config }, indexMap);
 }
