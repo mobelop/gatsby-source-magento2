@@ -123,3 +123,6 @@ Add other node sources:
 [gatsby]: https://www.gatsbyjs.org/
 [magento]: https://magento.com/
  
+## Contacts / Support
+
+Stanislav Smovdorenko: info@mobelop.com
