@@ -19,12 +19,9 @@ async function createImageNode(context, baseURL, imageName, nodeData) {
         return;
     }
 
-    const image =
-        context.storeConfig.secure_base_media_url + baseURL + '/' + imageName;
-
     try {
         const fileNode = await createRemoteFileNode({
-            url: image,
+            url: imageName,
             store: context.store,
             cache: context.cache,
             createNode: context.createNode,
