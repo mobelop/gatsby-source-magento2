@@ -27,6 +27,7 @@ async function createImageNode(context, baseURL, imageName, nodeData) {
             createNode: context.createNode,
             createNodeId: context.createNodeId,
             auth: context.auth,
+            parentNodeId: nodeData.id,
         });
 
         if (fileNode) {
@@ -57,6 +58,45 @@ async function createImageNodeFromFile(context, file) {
     }
 
     return null;
+}
+
+export async function downloadAndCacheImage(
+    { url, nodeId },
+    { createNode, createNodeId, touchNode, store, cache, getCache, reporter }
+) {
+    let fileNodeID;
+
+    if (!url || url === 'null') {
+        return;
+    }
+
+    const imageCacheId = `mageimg__${url}`;
+    const cachedImageNode = await cache.get(imageCacheId);
+
+    if (cachedImageNode) {
+        fileNodeID = cachedImageNode.fileNodeID;
+        touchNode({ nodeId: fileNodeID });
+        return fileNodeID;
+    }
+
+    const fileNode = await createRemoteFileNode({
+        url,
+        store,
+        cache,
+        createNode,
+        createNodeId,
+        getCache,
+        parentNodeId: nodeId,
+        reporter,
+    });
+
+    if (fileNode) {
+        fileNodeID = fileNode.id;
+        await cache.set(imageCacheId, { fileNodeID });
+        return fileNodeID;
+    }
+
+    return undefined;
 }
 
 export default createImageNode;

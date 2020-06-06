@@ -1,11 +1,21 @@
 import { GraphQLClient } from 'graphql-request';
-import { createRemoteFileNode } from 'gatsby-source-filesystem';
 import allProductsQuery from './queries/products';
 import crypto from 'crypto';
-import fs from 'fs';
+import { downloadAndCacheImage } from './images';
 
 const createProductNodes = (
-    { createNode, createPage, createNodeId, store, cache, reporter, auth },
+    {
+        createNode,
+        createPage,
+        createNodeId,
+        touchNode,
+        createContentDigest,
+        store,
+        cache,
+        getCache,
+        reporter,
+        auth,
+    },
     { graphqlEndpoint, storeConfig, queries },
     productMap,
     indexMap
@@ -18,9 +28,15 @@ const createProductNodes = (
         reporter.panic(`got empty storeConfig.secure_base_media_url`);
     }
 
-    if (!fs.existsSync('.skip')) {
-        fs.mkdirSync('.skip');
-    }
+    const imageArgs = {
+        createNode,
+        createNodeId,
+        touchNode,
+        store,
+        cache,
+        getCache,
+        reporter,
+    };
 
     return new Promise(async (resolve, reject) => {
         const client = new GraphQLClient(graphqlEndpoint, {});
@@ -33,13 +49,15 @@ const createProductNodes = (
 
         const res = await client.request(query);
 
+        const bar = reporter.createProgress('Downloading product images');
+        bar.start();
+        bar.total = res.products.items.length;
+
         for (let i = 0; i < res.products.items.length; i++) {
+            bar.tick();
+
             try {
                 const item = res.products.items[i];
-
-                if (fs.existsSync(`.skip/${item.id}`)) {
-                    continue;
-                }
 
                 if (!item) {
                     reporter.panic(
@@ -52,24 +70,23 @@ const createProductNodes = (
                 }
 
                 const image = item.image.url;
+                const productNodeId = createNodeId(`product-${item.id}`);
 
-                const fileNode = await createRemoteFileNode({
-                    url: image,
-                    store,
-                    cache,
-                    createNode,
-                    createNodeId,
-                    auth,
-                });
+                const fileNodeId = await downloadAndCacheImage(
+                    {
+                        url: image,
+                    },
+                    imageArgs
+                );
 
-                if (fileNode) {
+                if (fileNodeId) {
                     delete item.image;
 
-                    item.image___NODE = fileNode.id;
+                    item.image___NODE = fileNodeId;
 
                     const nodeData = {
                         ...item,
-                        id: createNodeId(`product-${item.id}`),
+                        id: productNodeId,
                         magento_id: item.id,
                         parent: `__PRODUCTS__`,
                         children: [],
@@ -90,26 +107,32 @@ const createProductNodes = (
                     indexMap['product'][item.id] = nodeData.id;
                     indexMap['product']['sku_' + item.sku] = nodeData.id;
 
-                    const aggregate = ['new', 'eco_collection']
+                    const aggregate = ['new', 'eco_collection'];
 
-                    for(const aggr of aggregate) {
-                        const key = aggr + '_' + item[aggr]
-                        if(!indexMap['product'][key]) {
-                            indexMap['product'][key] = []
+                    for (const aggr of aggregate) {
+                        const key = aggr + '_' + item[aggr];
+                        if (!indexMap['product'][key]) {
+                            indexMap['product'][key] = [];
                         }
 
                         indexMap['product'][key].push(nodeData.id);
                     }
-
                 } else {
-                    fs.writeFileSync(`.skip/${item.id}`);
-                    console.error('failed to download image:', image);
+                    console.error(
+                        'failed to download image:',
+                        image,
+                        ', for SKU:',
+                        item.sku
+                    );
                 }
             } catch (e) {
+                console.error(e);
+                bar.end ? bar.end() : bar.done();
                 reject(e);
             }
         }
 
+        bar.end ? bar.end() : bar.done();
         resolve();
     });
 };
