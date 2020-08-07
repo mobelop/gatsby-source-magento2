@@ -1,7 +1,7 @@
 {
   "name": "gatsby-source-magento2",
   "description": "GatsbyJS plugin which fetches storefront data from the Magento2 GraphQL endpoint",
-  "version": "2.3.5b6",
+  "version": "2.3.5b12",
   "author": "Stanislav Smovdorenko <stan.sm@mobelop.com>",
   "bugs": {
     "url": "https://github.com/mobelop/gatsby-source-magento2/issues"
@@ -11,14 +11,16 @@
     "cross-env": "^5.2.0",
     "cross-fetch": "2.2.2",
     "gatsby-source-filesystem": "^2.0.10",
-    "graphql-request": "^1.8.2"
+    "graphql": "^15.3.0",
+    "graphql-request": "^3.0"
   },
   "devDependencies": {
-    "@babel/cli": "^7.0.0",
-    "@babel/core": "^7.0.0",
-    "babel-jest": "^26.0.1",
-    "babel-preset-gatsby-package": "^0.4.2",
-    "jest": "^26.0.1"
+    "@babel/cli": "^7.10",
+    "@babel/core": "^7.10",
+    "@babel/helper-plugin-utils": "^7.10.4",
+    "babel-jest": "^26.2",
+    "babel-preset-gatsby-package": "^0.5",
+    "jest": "^26.2"
   },
   "homepage": "https://github.com/mobelop/gatsby-source-magento2#readme",
   "keywords": [
@@ -30,7 +32,8 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "gatsby": ">2.0.60"
+    "gatsby": ">2.0.60",
+    "graphql": "^14.5"
   },
   "repository": "https://github.com/mobelop/gatsby-source-magento2",
   "scripts": {

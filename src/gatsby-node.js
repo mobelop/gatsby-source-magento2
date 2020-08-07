@@ -1,7 +1,17 @@
 import createMagentoNodes from './nodes/index.js';
 
 exports.sourceNodes = async (
-    { actions, getNode, store, cache, createNodeId, reporter, auth },
+    {
+        actions,
+        getNode,
+        store,
+        cache,
+        getCache,
+        createNodeId,
+        createContentDigest,
+        reporter,
+        auth,
+    },
     options
 ) => {
     const { createNode, touchNode, createPage } = actions;
@@ -16,8 +26,10 @@ exports.sourceNodes = async (
         {
             store,
             cache,
+            getCache,
             createNode,
             createNodeId,
+            createContentDigest,
             touchNode,
             createPage,
             auth,

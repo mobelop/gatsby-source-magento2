@@ -1,10 +1,19 @@
 import { GraphQLClient } from 'graphql-request';
 import categoryQuery from './queries/categories';
-import createImageNode from './images';
+import createImageNode, { downloadAndCacheImage } from './images';
 import crypto from 'crypto';
 
 const createCategoryNodes = (
-    { createNode, createPage, createNodeId, store, cache, reporter, auth },
+    {
+        createNode,
+        createPage,
+        createNodeId,
+        store,
+        cache,
+        reporter,
+        auth,
+        touchNode,
+    },
     { graphqlEndpoint, storeConfig, queries },
     productMap
 ) => {
@@ -28,6 +37,9 @@ const createCategoryNodes = (
     return new Promise(async (resolve, reject) => {
         const client = new GraphQLClient(graphqlEndpoint, {});
 
+        const bar = reporter.createProgress('Downloading category images');
+        bar.start();
+
         await fetchCategories(
             {
                 client,
@@ -42,12 +54,17 @@ const createCategoryNodes = (
                 auth,
                 store,
                 cache,
+                touchNode,
+                bar,
             },
             2,
             productMap
         );
 
-        activity.end();
+        bar.end ? bar.end() : bar.done();
+        try {
+            activity.end();
+        } catch (e) {}
 
         resolve();
     });
@@ -61,7 +78,15 @@ export default createCategoryNodes;
  * @returns {Promise<void>}
  */
 async function fetchCategories(context, rootId, productMap) {
-    const { client, query, reject, createNodeId, createNode, cache } = context;
+    const {
+        client,
+        query,
+        reject,
+        createNodeId,
+        createNode,
+        cache,
+        bar,
+    } = context;
     const ids = [];
 
     try {
@@ -77,7 +102,10 @@ async function fetchCategories(context, rootId, productMap) {
             cache.set(categoryCacheKey, res);
         }
 
+        bar.total += res.category.children.length;
+
         for (const item of res.category.children) {
+            bar.tick();
             let children = [];
             if (item.children_count > 0) {
                 // load each of the child categories
@@ -112,20 +140,37 @@ async function fetchCategories(context, rootId, productMap) {
                 },
             };
 
-            await createImageNode(
-                context,
-                'catalog/category',
-                item.image,
-                nodeData
-            );
+            try {
+                const fileNodeId = await downloadAndCacheImage(
+                    {
+                        url: preprocessUrl(item.image),
+                    },
+                    context
+                );
+
+                if (fileNodeId) {
+                    nodeData.image___NODE = fileNodeId;
+                }
+            } catch(e) {
+                console.error('error downloading category image:', item.image)
+                console.error(e)
+            }
 
             createNode(nodeData);
 
             ids.push(nodeData.id);
         }
     } catch (e) {
+        console.error(e);
         reject(e);
     }
 
     return ids;
+}
+
+function preprocessUrl(url) {
+    if (url) {
+        return url.replace('/index.php/media/', '/media/');
+    }
+    return url;
 }
