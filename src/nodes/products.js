@@ -1,4 +1,4 @@
-import { GraphQLClient } from 'graphql-request';
+import { rawRequest } from 'graphql-request';
 import allProductsQuery from './queries/products';
 import crypto from 'crypto';
 import { downloadAndCacheImage } from './images';
@@ -39,34 +39,45 @@ const createProductNodes = (
     };
 
     return new Promise(async (resolve, reject) => {
-        const client = new GraphQLClient(graphqlEndpoint, {});
-
         // use custom query for querying products
         const query =
             queries && queries.allProductsQuery
                 ? queries.allProductsQuery
                 : allProductsQuery;
 
-        const res = await client.request(query);
+        let products = { items: [] };
+
+        try {
+            const {
+                data: { products: { items = [] } = {} } = {},
+                errors,
+            } = await rawRequest(graphqlEndpoint, query);
+
+            products = items;
+            logErrors(errors);
+        } catch (e) {
+            if (e.response) {
+                const {
+                    data: { products: { items = [] } = {} } = {},
+                    errors = [],
+                } = e.response;
+
+                products = items;
+                logErrors(errors);
+            }
+        }
 
         const bar = reporter.createProgress('Downloading product images');
         bar.start();
-        bar.total = res.products.items.length;
+        bar.total = products.length;
 
-        for (let i = 0; i < res.products.items.length; i++) {
+        for (const item of products) {
             bar.tick();
 
             try {
-                const item = res.products.items[i];
-
                 if (!item) {
-                    reporter.panic(
-                        `Got invalid result from GraphQL endpoint: ${JSON.stringify(
-                            item,
-                            0,
-                            2
-                        )}`
-                    );
+                    console.error(`gatsby-source-magento2: Got null product item in result`);
+                    continue;
                 }
 
                 const image = item.image.url;
@@ -138,3 +149,12 @@ const createProductNodes = (
 };
 
 export default createProductNodes;
+
+function logErrors(errors) {
+    if (errors && errors.length) {
+        console.error(
+            'ERRORS while querying products:',
+            JSON.stringify(errors, undefined, 4)
+        );
+    }
+}

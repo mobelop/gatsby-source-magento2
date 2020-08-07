@@ -4,7 +4,16 @@ import createImageNode, { downloadAndCacheImage } from './images';
 import crypto from 'crypto';
 
 const createCategoryNodes = (
-    { createNode, createPage, createNodeId, store, cache, reporter, auth, touchNode},
+    {
+        createNode,
+        createPage,
+        createNodeId,
+        store,
+        cache,
+        reporter,
+        auth,
+        touchNode,
+    },
     { graphqlEndpoint, storeConfig, queries },
     productMap
 ) => {
@@ -53,7 +62,9 @@ const createCategoryNodes = (
         );
 
         bar.end ? bar.end() : bar.done();
-        activity.end();
+        try {
+            activity.end();
+        } catch (e) {}
 
         resolve();
     });
@@ -129,15 +140,20 @@ async function fetchCategories(context, rootId, productMap) {
                 },
             };
 
-            const fileNodeId = await downloadAndCacheImage(
-                {
-                    url: item.image,
-                },
-                context
-            );
+            try {
+                const fileNodeId = await downloadAndCacheImage(
+                    {
+                        url: preprocessUrl(item.image),
+                    },
+                    context
+                );
 
-            if (fileNodeId) {
-                nodeData.image___NODE = fileNodeId;
+                if (fileNodeId) {
+                    nodeData.image___NODE = fileNodeId;
+                }
+            } catch(e) {
+                console.error('error downloading category image:', item.image)
+                console.error(e)
             }
 
             createNode(nodeData);
@@ -145,9 +161,16 @@ async function fetchCategories(context, rootId, productMap) {
             ids.push(nodeData.id);
         }
     } catch (e) {
-        console.error(e)
+        console.error(e);
         reject(e);
     }
 
     return ids;
+}
+
+function preprocessUrl(url) {
+    if (url) {
+        return url.replace('/index.php/media/', '/media/');
+    }
+    return url;
 }
