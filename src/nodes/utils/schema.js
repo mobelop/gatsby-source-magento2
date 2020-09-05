@@ -1,140 +1,324 @@
 import { print } from 'graphql/language/printer';
 import { Kind } from 'graphql';
+import gql from 'graphql-tag';
 
-export function convertMagentoSchemaToGatsby(types) {
-    const typeMap = {};
-
-    for (const type of types) {
-        mapTypes(type, typeMap);
-    }
-    // mapTypes(schema.productType, typeMap);
-    // mapTypes(schema.categoryType)
-
-    console.log(JSON.stringify(typeMap));
+export function convertMagentoSchemaToGatsby(query, schema) {
+    const typeMap = buildTypeMap(schema);
 
     const result = {
         kind: Kind.DOCUMENT,
-        definitions: Object.values(typeMap),
+        definitions: [],
     };
 
-    console.log('result:', JSON.stringify(result, 0, 4));
+    const context = {
+        typeStack: [],
+        typeMap,
+        result,
+        selectionStack: [],
+    };
+
+    context.typeStack.push(typeMap.ProductInterface);
+
+    const parsedQuery = gql(query);
+
+    for (const definition of parsedQuery.definitions) {
+        if (definition.kind === Kind.OPERATION_DEFINITION) {
+            scanSelections(
+                context,
+                definition.selectionSet.selections[0].selectionSet.selections[0]
+            );
+        }
+    }
+
+    // query.definitions
+    console.log('GENeRATED SHEMA:', JSON.stringify(result, 0, 4));
 
     return print(result);
 }
 
-function findType(types, name) {
+function scanSelections(context, definition) {
+    const {
+        selectionSet: { selections },
+    } = definition;
 
-}
-
-function mapTypes(type, typeMap) {
     const fields = [];
-    if (Array.isArray(type.fields)) {
-        for (const field of type.fields) {
-            switch (field.type.kind) {
-                case 'OBJECT':
-                    mapTypes(field.type, typeMap);
 
-                    fields.push({
-                        kind: 'FieldDefinition',
-                        name: {
-                            kind: 'Name',
-                            value: field.name,
-                        },
-                        type: {
-                            kind: 'NamedType',
-                            name: {
-                                kind: 'Name',
-                                value: magentoTypeName(field.type.name),
-                            },
-                        },
-                    });
+    // console.log('def:', definition);
+    for (const selection of selections) {
+        if (selection.selectionSet) {
+            const field = findField(context, selection);
+            console.log('dig into:', field);
 
-                    break;
-
-                case 'SCALAR':
-                    fields.push({
-                        kind: 'FieldDefinition',
-                        name: {
-                            kind: 'Name',
-                            value: field.name,
-                        },
-                        type: {
-                            kind: 'NamedType',
-                            name: {
-                                kind: 'Name',
-                                value: magentoTypeName(field.type.name),
-                            },
-                        },
-                    });
-                    break;
-
-                case 'NON_NULL':
-                    try {
-                        fields.push({
-                            kind: 'FieldDefinition',
-                            name: {
-                                kind: 'Name',
-                                value: field.name,
-                            },
-                            type: {
-                                kind: 'NamedType',
-                                name: {
-                                    kind: 'Name',
-                                    value: magentoTypeName(
-                                        field.type.ofType.name
-                                    ),
-                                },
-                            },
-                        });
-                    } catch (e) {
-                        console.error(e);
-                        console.log('while processing:', JSON.stringify(field));
-                    }
-                    break;
-
-                case 'LIST':
-                    try {
-                        if (field.type.ofType.name) {
-                            fields.push({
-                                kind: 'FieldDefinition',
-                                name: {
-                                    kind: 'Name',
-                                    value: field.name,
-                                },
-                                type: {
-                                    kind: 'ListType',
-                                    type: {
-                                        kind: 'NamedType',
-                                        name: {
-                                            kind: 'Name',
-                                            value: magentoTypeName(
-                                                field.type.ofType.name
-                                            ),
-                                        },
-                                    },
-                                },
-                            });
-                        }
-                    } catch (e) {
-                        console.error(e);
-                        console.log('while processing:', JSON.stringify(field));
-                    }
-                    break;
+            let needToPopType = false;
+            if (field.type.kind === 'OBJECT') {
+                context.selectionStack.push(field.type.name);
+                context.typeStack.push(context.typeMap[field.type.name]);
+                needToPopType = true;
+            } else if (field.type.kind === 'LIST') {
+                context.selectionStack.push(selection.name.value);
+                if (field.type.ofType) {
+                    context.typeStack.push(context.typeMap[field.type.ofType.name]);
+                    needToPopType = true;
+                }
+            } else {
+                context.selectionStack.push(selection.name.value);
             }
+
+            // context.selectionStack.push(selection.name.value);
+            const def = scanSelections(context, selection);
+            context.selectionStack.pop();
+
+            if (needToPopType) {
+                context.typeStack.pop();
+            }
+
+            fields.push(genNamedFieldDef(def, selection));
+        } else {
+            const field = genField(context, selection);
+            fields.push(field);
         }
     }
 
-    const typeName = magentoTypeName(type.name);
+    if (fields.length) {
+        let typeName = 'MagentoProduct';
 
-    typeMap[type.name] = {
-        kind: 'ObjectTypeDefinition',
+        if (context.selectionStack.length) {
+            typeName =
+                'Magento' +
+                context.selectionStack.map(item =>
+                    capitalizeFirstLetter(snakeToCamel(item))
+                );
+        }
+
+        const definition = {
+            kind: 'ObjectTypeDefinition',
+            name: {
+                kind: 'Name',
+                value: typeName,
+            },
+            fields,
+        };
+        context.result.definitions.push(definition);
+
+        return definition;
+    }
+}
+
+function snakeToCamel(s) {
+    return s.replace(/(\_\w)/g, function(m) {
+        return m[1].toUpperCase();
+    });
+}
+
+function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+function genField(context, selection) {
+    return {
+        kind: Kind.FIELD_DEFINITION,
         name: {
             kind: 'Name',
-            value: typeName,
+            value: selection.name.value,
         },
-        fields,
+        type: fieldType(context, selection),
     };
 }
+
+function genNamedFieldDef(def, selection) {
+    return {
+        kind: 'FieldDefinition',
+        name: {
+            kind: 'Name',
+            value: selection.name.value,
+        },
+        type: {
+            kind: 'NamedType',
+            name: {
+                kind: 'Name',
+                value: def.name.value,
+            },
+        },
+    };
+}
+
+function findField(context, selection) {
+    const { typeStack } = context;
+    const { fields } = typeStack[typeStack.length - 1];
+    const fieldName = selection.name.value;
+    for (const field of fields) {
+        if (field.name === fieldName) {
+            return field;
+        }
+    }
+
+    throw Error(
+        `couldn't find field ${fieldName} on type ${typeStack[typeStack.length - 1].name}`
+    );
+    return null;
+}
+
+function fieldType(context, selection) {
+    const field = findField(context, selection);
+
+    if (field) {
+        if (field.type.kind === 'SCALAR') {
+            return {
+                kind: 'NamedType',
+                name: {
+                    kind: 'Name',
+                    value: field.type.name,
+                },
+            };
+        }
+    }
+
+    return {
+        kind: 'NamedType',
+        name: {
+            kind: 'Name',
+            value: 'String',
+        },
+    };
+}
+
+function buildTypeMap(schema) {
+    const { types } = schema;
+    const typeMap = {};
+    for (const type of types) {
+        typeMap[type.name] = type;
+    }
+    return typeMap;
+}
+
+// export function convertMagentoSchemaToGatsby(types) {
+//     const typeMap = {};
+//
+//     for (const type of types) {
+//         mapTypes(type, typeMap);
+//     }
+//
+//     console.log(JSON.stringify(typeMap));
+//
+//     const result = {
+//         kind: Kind.DOCUMENT,
+//         definitions: Object.values(typeMap),
+//     };
+//
+//     console.log('result:', JSON.stringify(result, 0, 4));
+//
+//     return print(result);
+// }
+//
+// function mapTypes(type, typeMap) {
+//     const fields = [];
+//     if (Array.isArray(type.fields)) {
+//         for (const field of type.fields) {
+//             switch (field.type.kind) {
+//                 case 'OBJECT':
+//                     mapTypes(field.type, typeMap);
+//
+//                     fields.push({
+//                         kind: 'FieldDefinition',
+//                         name: {
+//                             kind: 'Name',
+//                             value: field.name,
+//                         },
+//                         type: {
+//                             kind: 'NamedType',
+//                             name: {
+//                                 kind: 'Name',
+//                                 value: magentoTypeName(field.type.name),
+//                             },
+//                         },
+//                     });
+//
+//                     break;
+//
+//                 case 'SCALAR':
+//                     fields.push({
+//                         kind: 'FieldDefinition',
+//                         name: {
+//                             kind: 'Name',
+//                             value: field.name,
+//                         },
+//                         type: {
+//                             kind: 'NamedType',
+//                             name: {
+//                                 kind: 'Name',
+//                                 value: magentoTypeName(field.type.name),
+//                             },
+//                         },
+//                     });
+//                     break;
+//
+//                 case 'NON_NULL':
+//                     try {
+//                         fields.push({
+//                             kind: 'FieldDefinition',
+//                             name: {
+//                                 kind: 'Name',
+//                                 value: field.name,
+//                             },
+//                             type: {
+//                                 kind: 'NamedType',
+//                                 name: {
+//                                     kind: 'Name',
+//                                     value: magentoTypeName(
+//                                         field.type.ofType.name
+//                                     ),
+//                                 },
+//                             },
+//                         });
+//                     } catch (e) {
+//                         console.error(e);
+//                         console.log('while processing:', JSON.stringify(field));
+//                     }
+//                     break;
+//
+//                 case 'LIST':
+//                     try {
+//                         if (field.type.ofType.name) {
+//                             fields.push({
+//                                 kind: 'FieldDefinition',
+//                                 name: {
+//                                     kind: 'Name',
+//                                     value: field.name,
+//                                 },
+//                                 type: {
+//                                     kind: 'ListType',
+//                                     type: {
+//                                         kind: 'NamedType',
+//                                         name: {
+//                                             kind: 'Name',
+//                                             value: magentoTypeName(
+//                                                 field.type.ofType.name
+//                                             ),
+//                                         },
+//                                     },
+//                                 },
+//                             });
+//                         }
+//                     } catch (e) {
+//                         console.error(e);
+//                         console.log('while processing:', JSON.stringify(field));
+//                     }
+//                     break;
+//             }
+//         }
+//     }
+//
+//     const typeName = magentoTypeName(type.name);
+//
+//     typeMap[type.name] = {
+//         kind: 'ObjectTypeDefinition',
+//         name: {
+//             kind: 'Name',
+//             value: typeName,
+//         },
+//         fields,
+//     };
+// }
 
 function magentoTypeName(name) {
     switch (name) {
