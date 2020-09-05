@@ -1,6 +1,6 @@
 import createMagentoNodes from './nodes/index.js';
 
-exports.sourceNodes = async (
+export const sourceNodes = async (
     {
         actions,
         getNode,
@@ -22,7 +22,7 @@ exports.sourceNodes = async (
         );
     }
 
-    return await createMagentoNodes(
+    await createMagentoNodes(
         {
             store,
             cache,
