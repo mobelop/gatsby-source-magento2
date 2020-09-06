@@ -7,10 +7,11 @@ import { rawRequest } from 'graphql-request';
 import { createProductNode } from './products';
 
 export default async function watchForUpdates(context, config, importMaps) {
+    const { reporter } = context;
     const {
         pubsubEndpoint = 'http://pubsub.mobelop.com/graphql',
         storeConfig,
-        watch,
+        watch = false,
     } = config;
 
     if (!watch || process.env.NODE_ENV === 'production') {
@@ -23,8 +24,8 @@ export default async function watchForUpdates(context, config, importMaps) {
         singleProductQuery: getSingleProductQuery(config),
     };
 
-    console.log(
-        `monitoring catalog changes, storeUrl: ${base_url}, pubsub: ${pubsubEndpoint}...`
+    reporter.info(
+        `[gatsby-source-magento2] watching catalog changes, storeUrl: ${base_url}, pubsub: ${pubsubEndpoint}...`
     );
 
     try {
@@ -51,7 +52,13 @@ export default async function watchForUpdates(context, config, importMaps) {
                     updates: { type, value },
                 } = res.data;
 
-                console.log('got data:', JSON.stringify(res.data, null, 2));
+                reporter.info(
+                    `[gatsby-source-magento2] received update from the store: ${JSON.stringify(
+                        res.data,
+                        null,
+                        2
+                    )}`
+                );
 
                 try {
                     const [action, entity] = type.split(':');
@@ -83,8 +90,7 @@ export default async function watchForUpdates(context, config, importMaps) {
 }
 
 async function updateProduct(context, config, importMaps, sku) {
-    console.log('updateProduct', sku);
-
+    const { reporter } = context;
     const { graphqlEndpoint, singleProductQuery } = config;
 
     let products = [];
@@ -111,6 +117,10 @@ async function updateProduct(context, config, importMaps, sku) {
     }
 
     if (products.length) {
+        reporter.info(
+            `[gatsby-source-magento2] product ${products[0].sku} was updated`
+        );
+
         await createProductNode(context, products[0], importMaps);
     }
 }
