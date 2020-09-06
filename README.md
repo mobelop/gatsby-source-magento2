@@ -1,13 +1,16 @@
 # gatsby-source-magento2
 
-Source plugin for pulling data into [Gatsby][gatsby] from [Magento 2.3][magento]
+Source plugin for pulling data into [Gatsby][gatsby] from [Magento 2.3][magento] which allows to build Headless Magento 2 Storefronts, deployed to the CDN - Netlify, Vercel, etc
 
-Supports: **Magento 2.3.5** Community Edition
+Sample store on Vercel: https://basketballhoopandbaskets.com/
+
+Supports: **Magento 2.3+** Community & Enterprise Editions
 
 ## Features
 
 - Provides public data available via standard Magento 2.3 GraphQL endpoint
-- Supports `gatsby-transformer-sharp` and `gatsby-image` for images
+- Supports `gatsby-transformer-sharp` and `gatsby-image` for image nodes
+- Supports real-time updates of the Magento 2 product catalog in development mode
 
 ## Install
 
