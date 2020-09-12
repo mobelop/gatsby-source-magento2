@@ -22,27 +22,70 @@ export function convertMagentoSchemaToGatsby(query, schema) {
 
     for (const definition of parsedQuery.definitions) {
         if (definition.kind === Kind.OPERATION_DEFINITION) {
-            let selection =
-                definition.selectionSet.selections[0].selectionSet
-                    .selections[0];
+            // is it a query?
+            let querySelections = definition.selectionSet.selections;
 
-            context.stack.push({
-                field: {
-                    name: 'items',
-                    type: {
-                        kind: 'OBJECT',
-                        name: 'ProductInterface',
-                        ofType: null,
-                    },
-                },
-                selection,
-            });
+            for (const selection of querySelections) {
+                if (selection.kind === Kind.FIELD) {
+                    switch (selection.name.value) {
+                        case 'category':
+                            scanCategory(
+                                context,
+                                selection.selectionSet.selections
+                            );
 
-            scanSelections(context, selection);
+                            break;
+
+                        case 'products':
+                            scanProducts(
+                                context,
+                                selection.selectionSet.selections
+                            );
+
+                            break;
+                    }
+                }
+            }
         }
     }
 
     return print(result);
+}
+
+function scanProducts(context, selections) {
+    let selection = selections[0];
+
+    context.stack.push({
+        field: {
+            name: 'items',
+            type: {
+                kind: 'OBJECT',
+                name: 'ProductInterface',
+                ofType: null,
+            },
+        },
+        selection,
+    });
+
+    scanSelections(context, selection);
+}
+
+function scanCategory(context, selections) {
+    let selection = selections[0];
+
+    context.stack.push({
+        field: {
+            name: 'children',
+            type: {
+                kind: 'OBJECT',
+                name: 'CategoryInterface',
+                ofType: null,
+            },
+        },
+        selection,
+    });
+
+    scanSelections(context, selection);
 }
 
 function scanSelections(context, definition, fragment = null) {
@@ -120,7 +163,7 @@ function scanSelections(context, definition, fragment = null) {
             fields,
         };
 
-        if (typeName === 'MagentoProduct') {
+        if (typeName === 'MagentoProduct' || typeName === 'MagentoCategory') {
             definition.interfaces = [
                 { kind: 'NamedType', name: { kind: 'Name', value: 'Node' } },
             ];
@@ -181,12 +224,12 @@ function getTypeNameFor(context) {
     const { stack } = context;
     const field = getCurrentField(context);
 
-    if (field.name === 'items' && stack.length > 0) {
-        const result =
-            'Magento' + getCurrentType(context).replace('Interface', '');
-
-        return result;
-    }
+    // if (field.name === 'items' && stack.length > 0) {
+    //     const result =
+    //         'Magento' + getCurrentType(context).replace('Interface', '');
+    //
+    //     return result;
+    // }
 
     let name = ['Magento'];
 

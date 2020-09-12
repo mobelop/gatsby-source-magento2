@@ -4,6 +4,7 @@ import {
     getRemoteGraphQLSchema,
 } from './nodes/utils/schema';
 import allProductsQuery from './nodes/queries/products';
+import categoryQuery from './nodes/queries/categories';
 
 export const sourceNodes = async (
     {
@@ -61,7 +62,7 @@ export const onPreBootstrap = async (context, config) => {
             '[gatsby-source-magento2] Fetching remote GraphQL schema'
         );
 
-        const { graphqlEndpoint } = config;
+        const { graphqlEndpoint, queries } = config;
         const schema = await getRemoteGraphQLSchema({
             graphqlEndpoint,
         });
@@ -70,9 +71,23 @@ export const onPreBootstrap = async (context, config) => {
             '[gatsby-source-magento2] Transforming to Gatsby-compatible GraphQL SDL'
         );
 
-        stateCache['schema'] = convertMagentoSchemaToGatsby(
-            allProductsQuery,
-            schema
+        const selectedProductsQuery =
+            queries && queries.allProductsQuery
+                ? queries.allProductsQuery
+                : allProductsQuery;
+
+        const selectedCategoriesQuery =
+            queries && queries.categoryQuery
+                ? queries.categoryQuery
+                : categoryQuery;
+
+        stateCache['schemas'] = [];
+
+        stateCache['schemas'].push(
+            convertMagentoSchemaToGatsby(selectedProductsQuery, schema)
+        );
+        stateCache['schemas'].push(
+            convertMagentoSchemaToGatsby(selectedCategoriesQuery, schema)
         );
     } catch (err) {
         if (err.isWarning) {
@@ -85,6 +100,7 @@ export const onPreBootstrap = async (context, config) => {
 
 export const createSchemaCustomization = ({ actions }, pluginConfig) => {
     const { createTypes } = actions;
-    const graphqlSdl = stateCache['schema'];
-    createTypes(graphqlSdl);
+    for(const schema of stateCache['schemas']) {
+        createTypes(schema);
+    }
 };

@@ -199,13 +199,13 @@ test('fragments on BundleProduct', () => {
         type MagentoProductFragmentBundleProductItemsOptions {
             label: String
         }
-        type MagentoBundleItem {
+        type MagentoProductFragmentBundleProductItems {
             options: [MagentoProductFragmentBundleProductItemsOptions]
         }
 
         type MagentoProduct implements Node @dontInfer {
             sku: String
-            items: [MagentoBundleItem]
+            items: [MagentoProductFragmentBundleProductItems]
             id: ID!
             parent: Node
             children: [Node!]!
@@ -216,11 +216,77 @@ test('fragments on BundleProduct', () => {
     expect(result).toEqual(print(targetSchema));
 });
 
-test('generates schema for full query', () => {
+test('category query works', () => {
+    const query = `
+    query fetchCategory($id: Int!){
+        category(id: $id) {
+            children {
+                name
+            }
+        }
+    }`;
+
+    const result = convertMagentoSchemaToGatsby(
+        query,
+        fullSchema.data.__schema
+    );
+
+    expect(result).toEqual(
+        print(gql`
+            type MagentoCategory implements Node @dontInfer {
+                name: String
+                id: ID!
+                parent: Node
+                children: [Node!]!
+                internal: Internal!
+            }
+        `)
+    );
+});
+
+test('category selections work', () => {
+    const query = `
+    query fetchCategory($id: Int!){
+        category(id: $id) {
+            children {
+                products(pageSize: 10000) {
+                    items {
+                        id
+                    }
+                }
+            }
+        }
+    }`;
+
+    const result = convertMagentoSchemaToGatsby(
+        query,
+        fullSchema.data.__schema
+    );
+
+    expect(result).toEqual(
+        print(gql`
+            type MagentoCategoryProductsItems {
+                id: Int
+            }
+
+            type MagentoCategoryProducts {
+                items: [MagentoCategoryProductsItems]
+            }
+
+            type MagentoCategory implements Node @dontInfer {
+                products: MagentoCategoryProducts
+                id: ID!
+                parent: Node
+                children: [Node!]!
+                internal: Internal!
+            }
+        `)
+    );
+});
+
+test('generates schema for the full query', () => {
     const result = convertMagentoSchemaToGatsby(
         allProductsQuery,
         fullSchema.data.__schema
     );
-
-    // console.log('result:', result)
 });
