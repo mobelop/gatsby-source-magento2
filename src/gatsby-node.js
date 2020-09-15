@@ -20,7 +20,7 @@ export const sourceNodes = async (
     },
     options
 ) => {
-    const { createNode, touchNode, createPage } = actions;
+    const { createNode, touchNode, createPage, deleteNode } = actions;
 
     if (!options.graphqlEndpoint) {
         reporter.panic(
@@ -35,6 +35,8 @@ export const sourceNodes = async (
             getCache,
             createNode,
             createNodeId,
+            deleteNode,
+            getNode,
             createContentDigest,
             touchNode,
             createPage,
@@ -100,7 +102,7 @@ export const onPreBootstrap = async (context, config) => {
 
 export const createSchemaCustomization = ({ actions }, pluginConfig) => {
     const { createTypes } = actions;
-    for(const schema of stateCache['schemas']) {
+    for (const schema of stateCache['schemas']) {
         createTypes(schema);
     }
 };

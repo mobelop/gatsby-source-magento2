@@ -8,9 +8,7 @@ const createProductNodes = (
     { graphqlEndpoint, storeConfig, queries },
     importMaps
 ) => {
-    const {
-        reporter,
-    } = context;
+    const { reporter } = context;
 
     if (!storeConfig) {
         reporter.panic(`got empty storeConfig`);
@@ -94,12 +92,17 @@ export async function createProductNode(context, item, importMaps) {
     const image = item.image.url;
     const productNodeId = createNodeId(`product-${item.id}`);
 
-    const fileNodeId = await downloadAndCacheImage(
-        {
-            url: image,
-        },
-        context
-    );
+    let fileNodeId;
+    try {
+        fileNodeId = await downloadAndCacheImage(
+            {
+                url: image,
+            },
+            context
+        );
+    } catch (e) {
+        fileNodeId = null;
+    }
 
     if (fileNodeId) {
         delete item.image;
@@ -109,6 +112,7 @@ export async function createProductNode(context, item, importMaps) {
         const nodeData = {
             ...item,
             id: productNodeId,
+            _xtypename: item.__typename,
             magento_id: item.id,
             parent: `__PRODUCTS__`,
             children: [],

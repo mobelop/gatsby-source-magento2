@@ -78,15 +78,7 @@ export default createCategoryNodes;
  * @returns {Promise<void>}
  */
 async function fetchCategories(context, rootId, productMap) {
-    const {
-        client,
-        query,
-        reject,
-        createNodeId,
-        createNode,
-        cache,
-        bar,
-    } = context;
+    const { client, query, reject, cache, bar } = context;
     const ids = [];
 
     try {
@@ -106,57 +98,12 @@ async function fetchCategories(context, rootId, productMap) {
 
         for (const item of res.category.children) {
             bar.tick();
-            let children = [];
-            if (item.children_count > 0) {
-                // load each of the child categories
-                children = await fetchCategories(context, item.id, productMap);
-            }
 
-            const itemCopy = {
-                ...item,
-            };
-
-            itemCopy.products___NODE = item.products.items.map(
-                item => productMap[item.id]
+            const nodeData = await createCategoryNode(
+                context,
+                item,
+                productMap
             );
-
-            itemCopy.children = children;
-
-            delete itemCopy.products;
-            delete itemCopy.image;
-
-            const nodeData = {
-                ...itemCopy,
-                id: createNodeId(`magento-category-${item.id}`),
-                magento_id: item.id,
-                parent_category_id: rootId,
-                internal: {
-                    type: 'MagentoCategory',
-                    content: JSON.stringify(itemCopy),
-                    contentDigest: crypto
-                        .createHash(`md5`)
-                        .update(JSON.stringify(itemCopy))
-                        .digest(`hex`),
-                },
-            };
-
-            try {
-                const fileNodeId = await downloadAndCacheImage(
-                    {
-                        url: preprocessUrl(item.image),
-                    },
-                    context
-                );
-
-                if (fileNodeId) {
-                    nodeData.image___NODE = fileNodeId;
-                }
-            } catch(e) {
-                console.error('error downloading category image:', item.image)
-                console.error(e)
-            }
-
-            createNode(nodeData);
 
             ids.push(nodeData.id);
         }
@@ -173,4 +120,75 @@ function preprocessUrl(url) {
         return url.replace('/index.php/media/', '/media/');
     }
     return url;
+}
+
+export async function createCategoryNode(context, item, productMap) {
+    const { createNode } = context;
+
+    const itemCopy = {
+        ...item,
+    };
+
+    let children = [];
+    if (item.children_count > 0) {
+        // load each of the child categories
+        children = await fetchCategories(context, item.id, productMap);
+    }
+
+    itemCopy.products___NODE = item.products.items.map(
+        item => productMap[item.id]
+    );
+
+    itemCopy.children = children;
+
+    delete itemCopy.products;
+    delete itemCopy.image;
+
+    let parent_category_id = 2;
+    const { breadcrumbs = [] } = itemCopy;
+    if (Array.isArray(breadcrumbs) && breadcrumbs.length) {
+        const topCategory = breadcrumbs[breadcrumbs.length - 1];
+        if (topCategory.category_id) {
+            parent_category_id = topCategory.category_id;
+        }
+    }
+
+    const nodeData = {
+        ...itemCopy,
+        id: createCategoryNodeId(context, item.id),
+        magento_id: item.id,
+        parent_category_id,
+        internal: {
+            type: 'MagentoCategory',
+            content: JSON.stringify(itemCopy),
+            contentDigest: crypto
+                .createHash(`md5`)
+                .update(JSON.stringify(itemCopy))
+                .digest(`hex`),
+        },
+    };
+
+    try {
+        const fileNodeId = await downloadAndCacheImage(
+            {
+                url: preprocessUrl(item.image),
+            },
+            context
+        );
+
+        if (fileNodeId) {
+            nodeData.image___NODE = fileNodeId;
+        }
+    } catch (e) {
+        console.error('error downloading category image:', item.image);
+        console.error(e);
+    }
+
+    createNode(nodeData);
+
+    return nodeData;
+}
+
+export function createCategoryNodeId(context, id) {
+    return context.createNodeId(`magento-category-${id}`);
 }

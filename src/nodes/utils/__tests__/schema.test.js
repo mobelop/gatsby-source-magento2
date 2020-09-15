@@ -23,6 +23,7 @@ test('first level fields', () => {
             type MagentoProduct implements Node @dontInfer {
                 sku: String
                 id: ID!
+                _xtypename: String
                 parent: Node
                 children: [Node!]!
                 internal: Internal!
@@ -57,6 +58,7 @@ test('lists work', () => {
             sku: String
             crosssell_products: [MagentoProductCrosssellProducts]
             id: ID!
+            _xtypename: String
             parent: Node
             children: [Node!]!
             internal: Internal!
@@ -90,6 +92,7 @@ test('objects work', () => {
         type MagentoProduct implements Node @dontInfer {
             description: MagentoProductDescription
             id: ID!
+            _xtypename: String
             parent: Node
             children: [Node!]!
             internal: Internal!
@@ -129,6 +132,7 @@ test('objects in objects', () => {
         type MagentoProduct implements Node @dontInfer {
             price_tiers: [MagentoProductPriceTiers]
             id: ID!
+            _xtypename: String
             parent: Node
             children: [Node!]!
             internal: Internal!
@@ -157,13 +161,14 @@ test('fragments', () => {
     );
 
     const targetSchema = gql`
-        type MagentoProductFragmentConfigurableProductConfigurableOptions {
+        type MagentoProductConfigurableOptions {
             attribute_id: String
         }
 
         type MagentoProduct implements Node @dontInfer {
-            configurable_options: [MagentoProductFragmentConfigurableProductConfigurableOptions]
+            configurable_options: [MagentoProductConfigurableOptions]
             id: ID!
+            _xtypename: String
             parent: Node
             children: [Node!]!
             internal: Internal!
@@ -196,17 +201,133 @@ test('fragments on BundleProduct', () => {
     );
 
     const targetSchema = gql`
-        type MagentoProductFragmentBundleProductItemsOptions {
+        type MagentoProductItemsOptions {
             label: String
         }
-        type MagentoProductFragmentBundleProductItems {
-            options: [MagentoProductFragmentBundleProductItemsOptions]
+        type MagentoProductItems {
+            options: [MagentoProductItemsOptions]
         }
 
         type MagentoProduct implements Node @dontInfer {
             sku: String
-            items: [MagentoProductFragmentBundleProductItems]
+            items: [MagentoProductItems]
             id: ID!
+            _xtypename: String
+            parent: Node
+            children: [Node!]!
+            internal: Internal!
+        }
+    `;
+
+    expect(result).toEqual(print(targetSchema));
+});
+
+test('overlapping fragments are merged into one type', () => {
+    const query = `{
+        products {
+            items {
+              sku
+              ... on BundleProduct {
+                dynamic_sku
+                items {
+                  options {
+                    label
+                    can_change_quantity
+                  }
+                }
+              }
+              ... on GroupedProduct {
+                items {
+                  position
+                  qty
+                  product {
+                    name
+                    sku
+                  }
+                }
+              }
+            }
+        }
+    }`;
+
+    const result = convertMagentoSchemaToGatsby(
+        query,
+        fullSchema.data.__schema
+    );
+
+    const targetSchema = gql`
+        type MagentoProductItemsOptions {
+            label: String
+            can_change_quantity: Boolean
+        }
+
+        type MagentoProductItems {
+            options: [MagentoProductItemsOptions]
+            position: Int
+            qty: Float
+            product: MagentoProductItemsProduct
+        }
+        
+        type MagentoProductItemsProduct {
+          name: String
+          sku: String
+        }
+
+        type MagentoProduct implements Node @dontInfer {
+            sku: String
+            dynamic_sku: Boolean
+            items: [MagentoProductItems]
+            id: ID!
+            _xtypename: String
+            parent: Node
+            children: [Node!]!
+            internal: Internal!
+        }
+    `;
+
+    expect(result).toEqual(print(targetSchema));
+});
+
+test('fragments: ProductPrices', () => {
+    const query = `
+    fragment ProductPrices on ProductInterface  {
+        special_price
+        price_tiers {
+            discount {
+              amount_off
+            }
+        }
+    }
+
+    query {
+        products {
+            items {
+                sku
+                ...ProductPrices
+            }
+        }
+    }`;
+
+    const result = convertMagentoSchemaToGatsby(
+        query,
+        fullSchema.data.__schema
+    );
+
+    const targetSchema = gql`
+        type MagentoProductPriceTiersDiscount {
+            amount_off: Float
+        }
+
+        type MagentoProductPriceTiers {
+            discount: MagentoProductPriceTiersDiscount
+        }
+
+        type MagentoProduct implements Node @dontInfer {
+            sku: String
+            special_price: Float
+            price_tiers: [MagentoProductPriceTiers]
+            id: ID!
+            _xtypename: String
             parent: Node
             children: [Node!]!
             internal: Internal!
@@ -235,7 +356,10 @@ test('category query works', () => {
         print(gql`
             type MagentoCategory implements Node @dontInfer {
                 name: String
+                magento_id: Int
+                parent_category_id: Int
                 id: ID!
+                _xtypename: String
                 parent: Node
                 children: [Node!]!
                 internal: Internal!
@@ -275,7 +399,72 @@ test('category selections work', () => {
 
             type MagentoCategory implements Node @dontInfer {
                 products: MagentoCategoryProducts
+                magento_id: Int
+                parent_category_id: Int
                 id: ID!
+                _xtypename: String
+                parent: Node
+                children: [Node!]!
+                internal: Internal!
+            }
+        `)
+    );
+});
+
+test('images are linked to File nodes for categories', () => {
+    const query = `
+    {
+        category(id: $id) {
+            children {
+                image
+            }
+        }
+    }
+    `;
+
+    const result = convertMagentoSchemaToGatsby(
+        query,
+        fullSchema.data.__schema
+    );
+
+    expect(result).toEqual(
+        print(gql`
+            type MagentoCategory implements Node @dontInfer {
+                image: File @link(from: "image___NODE")
+                magento_id: Int
+                parent_category_id: Int
+                id: ID!
+                _xtypename: String
+                parent: Node
+                children: [Node!]!
+                internal: Internal!
+            }
+        `)
+    );
+});
+
+test('images are linked to File nodes for products', () => {
+    const query = `
+    {
+        products {
+            items {
+                image
+            }
+        }
+    }
+    `;
+
+    const result = convertMagentoSchemaToGatsby(
+        query,
+        fullSchema.data.__schema
+    );
+
+    expect(result).toEqual(
+        print(gql`
+            type MagentoProduct implements Node @dontInfer {
+                image: File @link(from: "image___NODE")
+                id: ID!
+                _xtypename: String
                 parent: Node
                 children: [Node!]!
                 internal: Internal!
@@ -290,3 +479,232 @@ test('generates schema for the full query', () => {
         fullSchema.data.__schema
     );
 });
+
+test('generates schema for the full query 2', () => {
+    const result = convertMagentoSchemaToGatsby(
+        allProductsQuery2,
+        fullSchema.data.__schema
+    );
+});
+
+const allProductsQuery2 = `fragment ProductPrices on ProductInterface  {
+    price_range {
+        maximum_price {
+          discount { amount_off percent_off}
+          final_price { currency value }
+          fixed_product_taxes { amount {currency value} label}
+          regular_price { currency value }
+        }
+        minimum_price {
+          discount { percent_off amount_off}
+          final_price { currency value }
+          fixed_product_taxes { amount {currency value} label}
+          regular_price { currency value }
+        }
+      }  
+    special_price
+    price_tiers {
+        discount {
+          amount_off
+          percent_off
+        }
+    
+        final_price {
+          currency
+          value
+        }
+    
+        quantity
+      }
+}
+
+query {
+  products (
+    search:""
+    pageSize: 500
+  ) {
+    items {
+      id
+      sku
+      name
+      manufacturer
+      created_at
+      updated_at
+      type_id
+      __typename
+      description {
+        html
+      }
+      short_description {
+        html
+      }
+      meta_title
+      meta_keyword
+      meta_description
+      image {
+        label
+        url
+      }
+      url_key
+      new_to_date
+      new_from_date
+      manufacturer
+      small_image {label url}
+      thumbnail {label url}
+      price {
+        regularPrice {
+          adjustments {
+            amount {
+              currency
+              value
+            }
+          }
+          amount {
+            currency
+            value
+          }
+        }
+        maximalPrice {
+          adjustments {
+            amount {
+              currency
+              value
+            }
+          }
+          amount {
+            currency
+            value
+          }
+        }
+    
+        minimalPrice {
+          adjustments {
+            amount {
+              currency
+              value
+            }
+          }
+          amount {
+            currency
+            value
+          }
+        }
+      }
+      ...ProductPrices
+            
+      categories {
+        id
+        name
+        url_path
+        image
+      }
+
+      ... on CustomizableProductInterface {
+        options {
+          title
+          required
+          sort_order
+          option_id
+          
+          ... on CustomizableDropDownOption {
+            value {
+              sku
+              price
+              price_type
+              sort_order
+              title
+              option_type_id
+            }
+          }
+
+        }
+      }
+      
+      ... on ConfigurableProduct {
+        configurable_options {
+          attribute_id          
+          attribute_code          
+          label
+          values {
+            label
+            value_index
+          }
+        }
+      }
+      
+      ... on GroupedProduct {
+        items {
+          position
+          qty
+          product {
+            name
+            sku
+            manufacturer
+            __typename
+            price {
+                regularPrice {
+                  adjustments {
+                    amount {
+                      currency
+                      value
+                    }
+                  }
+                  amount {
+                    currency
+                    value
+                  }
+                }
+                maximalPrice {
+                  adjustments {
+                    amount {
+                      currency
+                      value
+                    }
+                  }
+                  amount {
+                    currency
+                    value
+                  }
+                }
+            
+                minimalPrice {
+                  adjustments {
+                    amount {
+                      currency
+                      value
+                    }
+                  }
+                  amount {
+                    currency
+                    value
+                  }
+                }
+              }
+            ...ProductPrices
+          }
+        }
+      }
+      
+      ... on BundleProduct {
+        items {
+          option_id
+          options {
+            id
+            label
+            position
+            price
+            price_type
+            product {
+              sku
+              __typename
+            }
+            
+            can_change_quantity
+            is_default          
+          }
+        }
+      }
+      
+    }
+  } 
+}`;

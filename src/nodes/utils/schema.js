@@ -16,9 +16,16 @@ export function convertMagentoSchemaToGatsby(query, schema) {
         result,
         stack: [],
         defs: {},
+        fragments: {},
     };
 
     const parsedQuery = gql(query);
+
+    for (const definition of parsedQuery.definitions) {
+        if (definition.kind === Kind.FRAGMENT_DEFINITION) {
+            context.fragments[definition.name.value] = definition;
+        }
+    }
 
     for (const definition of parsedQuery.definitions) {
         if (definition.kind === Kind.OPERATION_DEFINITION) {
@@ -89,7 +96,7 @@ function scanCategory(context, selections) {
 }
 
 function scanSelections(context, definition, fragment = null) {
-    const { defs } = context;
+    const { defs, fragments } = context;
 
     const {
         selectionSet: { selections },
@@ -116,6 +123,27 @@ function scanSelections(context, definition, fragment = null) {
             context.stack.pop();
 
             // merge fragment fields into current type
+            const definedFields = {};
+            for (const field of fields) {
+                definedFields[field.name.value] = field;
+            }
+
+            for (const field of subFields) {
+                if (definedFields[field.name.value]) {
+                    // don't add duplicates
+                    continue;
+                }
+                fields.push(field);
+            }
+
+            continue;
+        }
+
+        if (selection.kind === 'FragmentSpread') {
+            const fragment = fragments[selection.name.value];
+
+            const subFields = scanSelections(context, fragment, true);
+            // merge fragment fields into current type
             fields.push(...subFields);
 
             continue;
@@ -140,7 +168,10 @@ function scanSelections(context, definition, fragment = null) {
             const newField = genNamedFieldDef(context, def, selection);
             fields.push(newField);
         } else {
-            if (selection.name.value !== '__typename') {
+            if (selection.name.value === 'image') {
+                const field = fileField(selection);
+                fields.push(field);
+            } else if (selection.name.value !== '__typename') {
                 const field = genField(context, selection);
                 fields.push(field);
             }
@@ -174,16 +205,53 @@ function scanSelections(context, definition, fragment = null) {
                 },
             ];
 
+            if (typeName === 'MagentoCategory') {
+                fields.push({
+                    kind: 'FieldDefinition',
+                    name: {
+                        kind: 'Name',
+                        value: 'magento_id',
+                    },
+                    type: {
+                        kind: 'NamedType',
+                        name: {
+                            kind: 'Name',
+                            value: 'Int',
+                        },
+                    },
+                });
+                fields.push({
+                    kind: 'FieldDefinition',
+                    name: {
+                        kind: 'Name',
+                        value: 'parent_category_id',
+                    },
+                    type: {
+                        kind: 'NamedType',
+                        name: {
+                            kind: 'Name',
+                            value: 'Int',
+                        },
+                    },
+                });
+            }
             fields.push(...nodeFields);
         }
 
         if (!defs[typeName]) {
             context.result.definitions.push(definition);
             defs[typeName] = definition;
+        } else {
+            //
+            mergeTypeFields(defs[typeName], definition);
         }
 
         return definition;
     }
+}
+
+function mergeTypeFields(oldDefinition, newDefinition) {
+    oldDefinition.fields.push(...newDefinition.fields);
 }
 
 function getCurrentField(context) {
@@ -211,10 +279,15 @@ function getCurrentType(context) {
         throw new Error(`Field.type is null in field!`);
     }
 
-    if (field.type.kind === 'OBJECT' || field.type.kind === 'INTERFACE') {
-        return field.type.name;
-    } else if (field.type.kind === 'LIST') {
-        return field.type.ofType.name;
+    let type = field.type;
+    while (type.kind === 'NON_NULL') {
+        type = type.ofType;
+    }
+
+    if (type.kind === 'OBJECT' || type.kind === 'INTERFACE') {
+        return type.name;
+    } else if (type.kind === 'LIST') {
+        return type.ofType.name;
     } else {
         return 'UnknownType';
     }
@@ -224,13 +297,6 @@ function getTypeNameFor(context) {
     const { stack } = context;
     const field = getCurrentField(context);
 
-    // if (field.name === 'items' && stack.length > 0) {
-    //     const result =
-    //         'Magento' + getCurrentType(context).replace('Interface', '');
-    //
-    //     return result;
-    // }
-
     let name = ['Magento'];
 
     for (let i = 0; i < stack.length; i++) {
@@ -238,6 +304,11 @@ function getTypeNameFor(context) {
         const { field } = item;
 
         if (i > 0) {
+            // don't include fragment names in the type name
+            if (field.name.indexOf('fragment_') === 0) {
+                continue;
+            }
+
             name.push(capitalizeFirstLetter(snakeToCamel(field.name)));
         } else {
             name.push(field.type.name.replace('Interface', ''));
@@ -275,45 +346,7 @@ function genNamedFieldDef(context, def, selection) {
 
     // MagentoProductImage fields will be converted to the File nodes
     if (defType === 'MagentoProductImage') {
-        return {
-            kind: 'FieldDefinition',
-            name: {
-                kind: 'Name',
-                value: selection.name.value,
-            },
-            arguments: [],
-            type: {
-                kind: 'NamedType',
-                name: {
-                    kind: 'Name',
-                    value: 'File',
-                },
-            },
-            directives: [
-                {
-                    kind: 'Directive',
-                    name: {
-                        kind: 'Name',
-                        value: 'link',
-                    },
-                    arguments: [
-                        {
-                            kind: 'Argument',
-                            name: {
-                                kind: 'Name',
-                                value: 'from',
-                            },
-                            value: {
-                                kind: 'StringValue',
-                                // name of the foreign key field
-                                value: 'image___NODE',
-                                block: false,
-                            },
-                        },
-                    ],
-                },
-            ],
-        };
+        return fileField(selection);
     }
 
     if (field.type.kind === 'LIST') {
@@ -350,6 +383,48 @@ function genNamedFieldDef(context, def, selection) {
             },
         };
     }
+}
+
+function fileField(selection) {
+    return {
+        kind: 'FieldDefinition',
+        name: {
+            kind: 'Name',
+            value: selection.name.value,
+        },
+        arguments: [],
+        type: {
+            kind: 'NamedType',
+            name: {
+                kind: 'Name',
+                value: 'File',
+            },
+        },
+        directives: [
+            {
+                kind: 'Directive',
+                name: {
+                    kind: 'Name',
+                    value: 'link',
+                },
+                arguments: [
+                    {
+                        kind: 'Argument',
+                        name: {
+                            kind: 'Name',
+                            value: 'from',
+                        },
+                        value: {
+                            kind: 'StringValue',
+                            // name of the foreign key field
+                            value: 'image___NODE',
+                            block: false,
+                        },
+                    },
+                ],
+            },
+        ],
+    };
 }
 
 function findField(context, selection) {
@@ -510,6 +585,20 @@ const nodeFields = [
             },
         },
         directives: [],
+    },
+    {
+        kind: 'FieldDefinition',
+        name: {
+            kind: 'Name',
+            value: '_xtypename',
+        },
+        type: {
+            kind: 'NamedType',
+            name: {
+                kind: 'Name',
+                value: 'String',
+            },
+        },
     },
     {
         kind: 'FieldDefinition',
