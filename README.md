@@ -124,6 +124,10 @@ exports.createPages = ({ graphql, actions }) => {
 };
 ```
 
+## Future work
+
+- multi-store support
+
 [gatsby]: https://www.gatsbyjs.org/
 [magento]: https://magento.com/
  
