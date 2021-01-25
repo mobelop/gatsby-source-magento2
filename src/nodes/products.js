@@ -125,7 +125,6 @@ export async function createProductNode(context, item, importMaps) {
         },
     };
 
-    console.log('product:', JSON.stringify(nodeData, 0, 4))
     createNode(nodeData);
 
     productMap[item.id] = nodeData.id;
