@@ -473,6 +473,50 @@ test('images are linked to File nodes for products', () => {
     );
 });
 
+test('images are linked to File nodes for categories', () => {
+    const query = `
+    {
+        category(id: {eq: 1}) {
+            children {
+                products {
+                    items {
+                        image
+                    }
+                }
+            }
+        }
+    }
+    `;
+
+    const result = convertMagentoSchemaToGatsby(
+        query,
+        fullSchema.data.__schema
+    );
+
+    expect(result).toEqual(
+        print(gql`
+            type MagentoCategoryProductsItems {
+                image: File @link(from: "image___NODE")
+            }
+
+            type MagentoCategoryProducts {
+                items: [MagentoCategoryProductsItems]
+            }
+            
+            type MagentoCategory implements Node @dontInfer {
+                products: MagentoCategoryProducts
+                magento_id: Int
+                parent_category_id: Int
+                id: ID!
+                _xtypename: String
+                parent: Node
+                children: [Node!]!
+                internal: Internal!
+            }
+        `)
+    );
+});
+
 test('generates schema for the full query', () => {
     const result = convertMagentoSchemaToGatsby(
         allProductsQuery,
@@ -483,6 +527,13 @@ test('generates schema for the full query', () => {
 test('generates schema for the full query 2', () => {
     const result = convertMagentoSchemaToGatsby(
         allProductsQuery2,
+        fullSchema.data.__schema
+    );
+});
+
+test('generates schema for the full category query', () => {
+    const result = convertMagentoSchemaToGatsby(
+        allCategoryQuery,
         fullSchema.data.__schema
     );
 });
@@ -708,3 +759,100 @@ query {
     }
   } 
 }`;
+
+const allCategoryQuery = `
+  query fetchCategory($id: Int!) {
+    category(id: $id) {
+      children {
+        id
+        name
+        description
+
+        url_key
+        url_path
+
+        image
+
+        children_count
+        position
+
+        level
+        product_count
+        default_sort_by
+        meta_title
+        meta_keywords
+        meta_description
+        landing_page
+        is_anchor
+        include_in_menu
+        filter_price_range
+        display_mode
+        available_sort_by
+
+        breadcrumbs {
+          category_id
+          category_name
+          category_level
+          category_url_key
+        }
+
+        products(pageSize: 10000) {
+          items {
+            id
+            url_key
+            name
+
+            image {
+              label
+              url
+            }
+
+            price {
+              regularPrice {
+                adjustments {
+                  amount {
+                    currency
+                    value
+                  }
+                }
+                amount {
+                  currency
+                  value
+                }
+              }
+              maximalPrice {
+                adjustments {
+                  amount {
+                    currency
+                    value
+                  }
+                }
+                amount {
+                  currency
+                  value
+                }
+              }
+
+              minimalPrice {
+                adjustments {
+                  amount {
+                    currency
+                    value
+                  }
+                }
+                amount {
+                  currency
+                  value
+                }
+              }
+            }
+          }
+        }
+
+        path
+        path_in_store
+      }
+    }
+  }
+
+`

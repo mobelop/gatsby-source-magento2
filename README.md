@@ -1,12 +1,12 @@
 # gatsby-source-magento2
 
-Source plugin for pulling data into [Gatsby][gatsby] from [Magento 2.3][magento] which allows to build Headless Magento 2 Storefronts, deployed to the CDN - Netlify, Vercel, etc
+Source plugin for pulling data into [Gatsby][gatsby] from [Magento 2.4][magento] which allows building Headless Magento 2 Storefronts, deployed to the CDN - Netlify, Vercel, etc
 
 See this store deployed on Vercel for reference (built on [NeoStorefront](https://www.neostorefront.com/)):
 
 https://basketballhoopandbaskets.com/
 
-Supports: **Magento 2.3+** Community & Enterprise Editions
+Supports: **Magento 2.4+** Community & Enterprise Editions
 
 ## Features
 

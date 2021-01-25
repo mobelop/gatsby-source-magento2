@@ -99,4 +99,42 @@ export async function downloadAndCacheImage(
     return undefined;
 }
 
+export async function downloadNodeImages(context, node) {
+    await downloadImage(context, node, 'image')
+    await downloadImage(context, node, 'small_image')
+    await downloadImage(context, node, 'thumbnail')
+}
+
+async function downloadImage(context, node, key) {
+    if(!node[key]) {
+        return
+    }
+
+    try {
+        const fileNodeId = await downloadAndCacheImage(
+          {
+              url: preprocessUrl(node[key].url),
+          },
+          context
+        );
+
+        if (fileNodeId) {
+            delete node[key]
+            node[key + '___NODE'] = fileNodeId;
+        }
+
+    } catch (e) {
+        console.error('error downloading node image: ', node[key]);
+        console.error(e);
+    }
+}
+
+function preprocessUrl(url) {
+    if (url) {
+        return url.replace('/index.php/media/', '/media/');
+    }
+    return url;
+}
+
+
 export default createImageNode;

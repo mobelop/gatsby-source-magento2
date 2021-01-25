@@ -1,7 +1,7 @@
 import { rawRequest } from 'graphql-request';
 import allProductsQuery from './queries/products';
 import crypto from 'crypto';
-import { downloadAndCacheImage } from './images';
+import { downloadNodeImages } from "./images";
 
 const createProductNodes = (
     context,
@@ -89,66 +89,66 @@ function logErrors(errors) {
 export async function createProductNode(context, item, importMaps) {
     const { productMap, indexMap } = importMaps;
     const { createNodeId, createNode } = context;
-    const image = item.image.url;
     const productNodeId = createNodeId(`product-${item.id}`);
 
-    let fileNodeId;
-    try {
-        fileNodeId = await downloadAndCacheImage(
-            {
-                url: image,
-            },
-            context
-        );
-    } catch (e) {
-        fileNodeId = null;
+    await downloadNodeImages(context, item)
+
+    if(item.variants && item.variants.length) {
+        await downloadVariantsImages(context, item.variants)
     }
 
-    if (fileNodeId) {
-        delete item.image;
-
-        item.image___NODE = fileNodeId;
-
-        const nodeData = {
-            ...item,
-            id: productNodeId,
-            _xtypename: item.__typename,
-            magento_id: item.id,
-            parent: `__PRODUCTS__`,
-            children: [],
-            internal: {
-                type: 'MagentoProduct',
-                content: JSON.stringify(item),
-                contentDigest: crypto
-                    .createHash(`md5`)
-                    .update(JSON.stringify(item))
-                    .digest(`hex`),
-            },
-        };
-
-        createNode(nodeData);
-
-        productMap[item.id] = nodeData.id;
-
-        indexMap['product'][item.id] = nodeData.id;
-        indexMap['product']['sku_' + item.sku] = nodeData.id;
-
-        const aggregate = ['new', 'eco_collection'];
-
-        for (const aggr of aggregate) {
-            const key = aggr + '_' + item[aggr];
-            if (!indexMap['product'][key]) {
-                indexMap['product'][key] = [];
-            }
-
-            indexMap['product'][key].push(nodeData.id);
-        }
-    } else {
+    if(!item.image___NODE && !item.small_image___NODE) {
         console.error(
-            'failed to download image:',
-            image,
-            ', for SKU:',
-            item.sku
+          'failed to download image:',
+          item.image,
+          ', for SKU:',
+          item.sku
         );
+
+        return
+    }
+
+    const nodeData = {
+        ...item,
+        id: productNodeId,
+        _xtypename: item.__typename,
+        magento_id: item.id,
+        parent: `__PRODUCTS__`,
+        children: [],
+        internal: {
+            type: 'MagentoProduct',
+            content: JSON.stringify(item),
+            contentDigest: crypto
+                .createHash(`md5`)
+                .update(JSON.stringify(item))
+                .digest(`hex`),
+        },
+    };
+
+    console.log('product:', JSON.stringify(nodeData, 0, 4))
+    createNode(nodeData);
+
+    productMap[item.id] = nodeData.id;
+
+    indexMap['product'][item.id] = nodeData.id;
+    indexMap['product']['sku_' + item.sku] = nodeData.id;
+
+    const aggregate = ['new', 'eco_collection'];
+
+    for (const aggr of aggregate) {
+        const key = aggr + '_' + item[aggr];
+        if (!indexMap['product'][key]) {
+            indexMap['product'][key] = [];
+        }
+
+        indexMap['product'][key].push(nodeData.id);
+    }
+}
+
+async function downloadVariantsImages(context, variants) {
+    for(const variant of variants) {
+        if(variant.product) {
+            await downloadNodeImages(context, variant.product)
+        }
     }
 }

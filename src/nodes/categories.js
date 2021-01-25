@@ -1,6 +1,6 @@
 import { GraphQLClient } from 'graphql-request';
 import categoryQuery from './queries/categories';
-import createImageNode, { downloadAndCacheImage } from './images';
+import { downloadNodeImages } from './images';
 import crypto from 'crypto';
 
 const createCategoryNodes = (
@@ -115,13 +115,6 @@ async function fetchCategories(context, rootId, productMap) {
     return ids;
 }
 
-function preprocessUrl(url) {
-    if (url) {
-        return url.replace('/index.php/media/', '/media/');
-    }
-    return url;
-}
-
 export async function createCategoryNode(context, item, productMap) {
     const { createNode } = context;
 
@@ -135,14 +128,10 @@ export async function createCategoryNode(context, item, productMap) {
         children = await fetchCategories(context, item.id, productMap);
     }
 
-    itemCopy.products___NODE = item.products.items.map(
-        item => productMap[item.id]
-    );
+    // download images for product items
+    await processItemsImages(context, itemCopy.products.items)
 
     itemCopy.children = children;
-
-    delete itemCopy.products;
-    delete itemCopy.image;
 
     let parent_category_id = 2;
     const { breadcrumbs = [] } = itemCopy;
@@ -152,6 +141,8 @@ export async function createCategoryNode(context, item, productMap) {
             parent_category_id = topCategory.category_id;
         }
     }
+
+    await downloadNodeImages(context, itemCopy)
 
     const nodeData = {
         ...itemCopy,
@@ -168,22 +159,6 @@ export async function createCategoryNode(context, item, productMap) {
         },
     };
 
-    try {
-        const fileNodeId = await downloadAndCacheImage(
-            {
-                url: preprocessUrl(item.image),
-            },
-            context
-        );
-
-        if (fileNodeId) {
-            nodeData.image___NODE = fileNodeId;
-        }
-    } catch (e) {
-        console.error('error downloading category image:', item.image);
-        console.error(e);
-    }
-
     createNode(nodeData);
 
     return nodeData;
@@ -191,4 +166,10 @@ export async function createCategoryNode(context, item, productMap) {
 
 export function createCategoryNodeId(context, id) {
     return context.createNodeId(`magento-category-${id}`);
+}
+
+async function processItemsImages(context, items) {
+    for(const item of items) {
+        await downloadNodeImages(context, item)
+    }
 }

@@ -153,7 +153,10 @@ function scanSelections(context, definition, fragment = null) {
             continue;
         }
 
-        if (selection.selectionSet) {
+        if (selection.name.value.includes('image')) {
+            const field = fileField(selection);
+            fields.push(field);
+        } else if (selection.selectionSet) {
             const field = findField(context, selection);
 
             context.stack.push({
@@ -168,10 +171,7 @@ function scanSelections(context, definition, fragment = null) {
             const newField = genNamedFieldDef(context, def, selection);
             fields.push(newField);
         } else {
-            if (selection.name.value === 'image') {
-                const field = fileField(selection);
-                fields.push(field);
-            } else if (selection.name.value !== '__typename') {
+            if (selection.name.value !== '__typename') {
                 const field = genField(context, selection);
                 fields.push(field);
             }
@@ -417,7 +417,7 @@ function fileField(selection) {
                         value: {
                             kind: 'StringValue',
                             // name of the foreign key field
-                            value: 'image___NODE',
+                            value: selection.name.value + '___NODE',
                             block: false,
                         },
                     },
