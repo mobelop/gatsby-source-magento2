@@ -111,9 +111,10 @@ async function downloadImage(context, node, key) {
     }
 
     try {
+        const nodeUrl = node[key].url === undefined ? node[key] : node[key].url
         const fileNodeId = await downloadAndCacheImage(
           {
-              url: preprocessUrl(node[key].url),
+              url: preprocessUrl(nodeUrl),
           },
           context
         );
