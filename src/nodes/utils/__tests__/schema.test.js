@@ -517,6 +517,47 @@ test('images are linked to File nodes for categories', () => {
     );
 });
 
+test('File nodes are created for media_gallery entries', () => {
+    const query = `
+    {
+        products {
+            items {
+                media_gallery {
+                    url
+                    label
+                    position
+                }
+            }
+        }
+    }
+    `;
+
+    const result = convertMagentoSchemaToGatsby(
+        query,
+        fullSchema.data.__schema
+    );
+
+    expect(result).toEqual(
+        print(gql`
+            type MagentoProductMediaGallery {
+               url: String
+               label: String
+               position: Int
+               image: File @link(from: "image___NODE")
+            }
+
+            type MagentoProduct implements Node @dontInfer {
+                media_gallery: [MagentoProductMediaGallery]
+                id: ID!
+                _xtypename: String
+                parent: Node
+                children: [Node!]!
+                internal: Internal!
+            }
+        `)
+    );
+});
+
 test('generates schema for the full query', () => {
     const result = convertMagentoSchemaToGatsby(
         allProductsQuery,

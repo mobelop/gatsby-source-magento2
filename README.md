@@ -124,11 +124,74 @@ exports.createPages = ({ graphql, actions }) => {
 };
 ```
 
+## Using images from Product media gallery & product variants
+
+First you need to make sure your custom product query includes media_gallery & product variants:
+
+```graphql
+    query {
+        products {
+            url_key
+            
+            media_gallery {
+              url
+              label
+              position
+            }
+
+            ... on ConfigurableProduct {
+                configurable_options {
+                  attribute_id          
+                  attribute_code          
+                  label
+                  values {
+                    label
+                    value_index
+                    swatch_data {
+                      value
+                    }
+                    store_label
+                  }
+                }
+                
+                variants {
+                  attributes {
+                    code
+                    label
+                    uid
+                    value_index
+                  }
+                  
+                  product {
+                    sku
+                    stock_status
+                    image {label url}
+                    small_image {label url}
+                  }
+                }
+        
+            }
+
+        }
+    }
+```
+
+Gatsby source plugin will automatically create the following file nodes:
+
+```
+media_gallery.image
+variants.product.image
+variants.product.small_image
+```
+
+You can use [Gatsby image transformers][gatsby-image] on these.
+
 ## Future work
 
 - multi-store support
 
 [gatsby]: https://www.gatsbyjs.org/
+[gatsby-image]: https://www.gatsbyjs.com/plugins/gatsby-image/
 [magento]: https://magento.com/
  
 ## Contacts / Support

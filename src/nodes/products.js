@@ -97,6 +97,10 @@ export async function createProductNode(context, item, importMaps) {
         await downloadVariantsImages(context, item.variants)
     }
 
+    if(item.media_gallery && item.media_gallery.length) {
+        await downloadMediaGalleryImages(context, item.media_gallery)
+    }
+
     if(!item.image___NODE && !item.small_image___NODE) {
         console.error(
           'failed to download image:',
@@ -149,5 +153,15 @@ async function downloadVariantsImages(context, variants) {
         if(variant.product) {
             await downloadNodeImages(context, variant.product)
         }
+    }
+}
+
+async function downloadMediaGalleryImages(context, media_gallery) {
+    for(const image of media_gallery) {
+        image.image = {
+            url: image.url
+        }
+
+        await downloadNodeImages(context, image)
     }
 }

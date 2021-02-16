@@ -29,6 +29,12 @@ query {
         label
         url
       }
+      
+      media_gallery {
+        url
+        label
+        position
+      }
 
       url_key
       

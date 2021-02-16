@@ -182,6 +182,11 @@ function scanSelections(context, definition, fragment = null) {
         return fields;
     }
 
+    if(definition.name.value === 'media_gallery') {
+        const field = fileField('image');
+        fields.push(field);
+    }
+
     if (fields.length) {
         const typeName = getTypeNameFor(context);
 
@@ -193,6 +198,7 @@ function scanSelections(context, definition, fragment = null) {
             },
             fields,
         };
+
 
         if (typeName === 'MagentoProduct' || typeName === 'MagentoCategory') {
             definition.interfaces = [
@@ -386,11 +392,13 @@ function genNamedFieldDef(context, def, selection) {
 }
 
 function fileField(selection) {
+    const fieldName = selection.name ? selection.name.value : selection
+
     return {
         kind: 'FieldDefinition',
         name: {
             kind: 'Name',
-            value: selection.name.value,
+            value: fieldName,
         },
         arguments: [],
         type: {
@@ -417,7 +425,7 @@ function fileField(selection) {
                         value: {
                             kind: 'StringValue',
                             // name of the foreign key field
-                            value: selection.name.value + '___NODE',
+                            value: fieldName + '___NODE',
                             block: false,
                         },
                     },
