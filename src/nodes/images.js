@@ -62,7 +62,7 @@ async function createImageNodeFromFile(context, file) {
 
 export async function downloadAndCacheImage(
     { url, nodeId },
-    { createNode, createNodeId, touchNode, store, cache, getCache, reporter }
+    { createNode, createNodeId, touchNode, store, cache, getCache, reporter, getNode }
 ) {
     let fileNodeID;
 
@@ -75,7 +75,7 @@ export async function downloadAndCacheImage(
 
     if (cachedImageNode) {
         fileNodeID = cachedImageNode.fileNodeID;
-        touchNode({ nodeId: fileNodeID });
+        touchNode(getNode(fileNodeID));
         return fileNodeID;
     }
 
